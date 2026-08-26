@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Person {
+  id          String   @id @default(cuid())
+  name        String
+  nickname    String?
+  avatarUrl   String?
+  headline    String?
+  company     String?
+  location    String?
+  email       String?
+  skills      Json
+  interests   Json
+  tags        Json
+  notes       String?
+  links       Json
+  githubLogin String?
+  discordId   String?
+  isSelf      Boolean  @default(false)
+  outgoing    Edge[]   @relation("source")
+  incoming    Edge[]   @relation("target")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Edge {
+  id          String   @id @default(cuid())
+  sourceId    String
+  targetId    String
+  source      Person   @relation("source", fields: [sourceId], references: [id], onDelete: Cascade)
+  target      Person   @relation("target", fields: [targetId], references: [id], onDelete: Cascade)
+  origin      String   @default("other")
+  context     String?
+  communities Json
+  projects    Json
+  strength    Int      @default(2)
+  metAt       DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([sourceId, targetId])
+}
