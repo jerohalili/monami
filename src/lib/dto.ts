@@ -51,7 +51,6 @@ export function personDTO(p: PersonRow): Person {
     notes: p.notes,
     links: toRecord(p.links),
     githubLogin: p.githubLogin,
-    discordId: p.discordId,
     isSelf: p.isSelf,
   };
 }

@@ -16,7 +16,6 @@ export interface DemoPerson {
   notes?: string;
   links?: Record<string, string>;
   githubLogin?: string;
-  discordId?: string;
   isSelf?: boolean;
 }
 
@@ -57,7 +56,6 @@ export const DEMO_PEOPLE: DemoPerson[] = [
     interests: ["queueing theory", "indie hacking", "climbing"],
     tags: ["backend", "friend"],
     links: { GitHub: "https://github.com/mayachen-dev" },
-    discordId: "maya.dev#4021",
     notes:
       "Sharpest backend brain I know. Prefers async updates over meetings.",
   },
@@ -105,7 +103,6 @@ export const DEMO_PEOPLE: DemoPerson[] = [
     skills: ["Kubernetes", "Terraform", "Observability"],
     interests: ["homelab", "board games", "urban gardening"],
     tags: ["devops", "friend"],
-    discordId: "lenaf#1187",
   },
   {
     key: "diego",
@@ -116,7 +113,6 @@ export const DEMO_PEOPLE: DemoPerson[] = [
     skills: ["Unity", "C#", "Godot"],
     interests: ["game dev", "roguelikes", "speedrunning"],
     tags: ["gamedev"],
-    discordId: "druiz#0093",
   },
   {
     key: "sara",
@@ -137,8 +133,7 @@ export const DEMO_PEOPLE: DemoPerson[] = [
     headline: "Indie hacker",
     skills: ["TypeScript", "Prompt engineering", "Next.js"],
     interests: ["AI tooling", "indie hacking", "side projects"],
-    tags: ["ai", "discord"],
-    discordId: "akbuilds#2255",
+    tags: ["ai"],
   },
   {
     key: "nadia",
@@ -170,7 +165,7 @@ export const DEMO_EDGES: DemoEdge[] = [
   {
     from: "you",
     to: "maya",
-    origin: "discord",
+    origin: "online",
     context:
       "Met in #backend-help on Indie Dev Lounge when she debugged my queue worker over a screenshare. Weekly coworking since.",
     communities: ["Indie Dev Lounge"],
@@ -234,7 +229,7 @@ export const DEMO_EDGES: DemoEdge[] = [
   {
     from: "you",
     to: "alex",
-    origin: "discord",
+    origin: "online",
     context:
       "Weekly AI Builders voice chats; sends the best arxiv digests. Shipped three side projects this year.",
     communities: ["AI Builders"],
@@ -301,7 +296,6 @@ export async function insertDemoData(db: PrismaClient) {
         notes: p.notes ?? null,
         links: (p.links ?? {}) as unknown as Prisma.InputJsonValue,
         githubLogin: p.githubLogin ?? null,
-        discordId: p.discordId ?? null,
         isSelf: p.isSelf ?? false,
       },
     });

@@ -18,7 +18,6 @@ const OPTIONAL_STRINGS = [
   "email",
   "notes",
   "githubLogin",
-  "discordId",
 ] as const;
 
 function optionalString(v: unknown): string | null {

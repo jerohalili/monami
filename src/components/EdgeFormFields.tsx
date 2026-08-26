@@ -114,7 +114,7 @@ export function EdgeFormFields({
           className="field min-h-[80px]"
           value={value.context}
           onChange={set("context")}
-          placeholder="Met her in that indie-dev Discord, she does backend…"
+          placeholder="Met her at a meetup, she does backend…"
         />
       </div>
       <div>

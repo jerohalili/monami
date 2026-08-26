@@ -11,7 +11,6 @@ export interface PersonFormState {
   location: string;
   email: string;
   githubLogin: string;
-  discordId: string;
   skills: string;
   interests: string;
   tags: string;
@@ -28,7 +27,6 @@ export const EMPTY_PERSON_FORM: PersonFormState = {
   location: "",
   email: "",
   githubLogin: "",
-  discordId: "",
   skills: "",
   interests: "",
   tags: "",
@@ -46,7 +44,6 @@ export function personToForm(p: Person): PersonFormState {
     location: p.location ?? "",
     email: p.email ?? "",
     githubLogin: p.githubLogin ?? "",
-    discordId: p.discordId ?? "",
     skills: p.skills.join(", "),
     interests: p.interests.join(", "),
     tags: p.tags.join(", "),
@@ -74,7 +71,6 @@ export function formToPersonPayload(f: PersonFormState) {
     location: f.location.trim() || null,
     email: f.email.trim() || null,
     githubLogin: f.githubLogin.trim() || null,
-    discordId: f.discordId.trim() || null,
     skills: f.skills,
     interests: f.interests,
     tags: f.tags,
@@ -176,15 +172,6 @@ export function PersonFormFields({
             placeholder="adalovelace"
           />
         </div>
-      </div>
-      <div>
-        <label className="label">Discord ID</label>
-        <input
-          className="field"
-          value={value.discordId}
-          onChange={set("discordId")}
-          placeholder="ada#1234"
-        />
       </div>
       <div>
         <label className="label">Skills</label>

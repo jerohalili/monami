@@ -251,7 +251,7 @@ export default function NetworkApp() {
             <h1 className="text-lg font-semibold text-white">Your sky is empty</h1>
             <p className="text-sm leading-relaxed text-slate-400">
               Add the first person to your constellation, or load a sample network to explore what MonAmi can do.
-              GitHub and Discord sync plus people &amp; project recommendations are on the roadmap.
+              GitHub integration and people &amp; project recommendations are on the roadmap.
             </p>
             <div className="flex flex-col gap-2">
               <button className="btn-primary w-full" onClick={() => setShowAddPerson(true)}>

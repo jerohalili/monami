@@ -151,7 +151,7 @@ function PersonView({
         )}
       </div>
 
-      {(person.email || person.githubLogin || person.discordId) && (
+      {(person.email || person.githubLogin) && (
         <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
           {person.email && (
             <a href={`mailto:${person.email}`} className="block truncate text-slate-300 hover:text-white">
@@ -168,9 +168,6 @@ function PersonView({
               github.com/{person.githubLogin} <IconExternal width={12} height={12} />
             </a>
           )}
-          {person.discordId && (
-            <div className="mt-1 truncate text-[#8ea1ff]">{person.discordId}</div>
-          )}
         </div>
       )}
 
@@ -179,19 +176,9 @@ function PersonView({
           <button
             className="btn flex-1 text-slate-500"
             disabled
-            title="Planned (Milestone 2): pull repos, contributions and languages onto this node."
+            title="Planned: pull repos, contributions and languages onto this node."
           >
             GitHub sync
-            <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
-              soon
-            </span>
-          </button>
-          <button
-            className="btn flex-1 text-slate-500"
-            disabled
-            title="Planned (Milestone 3): attach shared servers to connections automatically."
-          >
-            Discord sync
             <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
               soon
             </span>
@@ -350,7 +337,7 @@ function RelationshipEditor({
           </div>
         )}
         <p className="mt-2 text-xs text-slate-500">
-          Shared-server detection via the Discord integration is coming soon.
+          Shared communities and projects can be recorded manually on each connection.
         </p>
       </div>
       <EdgeFormFields value={form} onChange={setForm} />

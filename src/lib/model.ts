@@ -1,6 +1,5 @@
 export const ORIGINS = {
   in_person: { label: "Met in person", color: "#f59e0b" },
-  discord: { label: "Discord", color: "#5865f2" },
   github: { label: "GitHub", color: "#a78bfa" },
   school: { label: "School", color: "#38bdf8" },
   work: { label: "Work", color: "#34d399" },
@@ -32,7 +31,6 @@ export interface Person {
   notes: string | null;
   links: Record<string, string>;
   githubLogin: string | null;
-  discordId: string | null;
   isSelf: boolean;
 }
 
@@ -56,7 +54,7 @@ export interface GraphPayload {
 export const ROADMAP = [
   { label: "People graph with relationship context", done: true },
   { label: "GitHub integration — repos, contributions, languages", done: false },
-  { label: "Discord integration — shared servers on edges", done: false },
+
   { label: "People-recommendation engine", done: false },
   { label: "Project-recommendation engine", done: false },
   { label: "Adaptive feedback layer", done: false },

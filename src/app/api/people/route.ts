@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
         notes: optionalString(r.notes),
         links: toLinksInput(r.links),
         githubLogin: optionalString(r.githubLogin),
-        discordId: optionalString(r.discordId),
       },
     });
     return NextResponse.json(personDTO(person), { status: 201 });

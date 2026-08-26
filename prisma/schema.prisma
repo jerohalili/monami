@@ -22,7 +22,6 @@ model Person {
   notes       String?
   links       Json
   githubLogin String?
-  discordId   String?
   isSelf      Boolean  @default(false)
   outgoing    Edge[]   @relation("source")
   incoming    Edge[]   @relation("target")

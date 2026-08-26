@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "MonAmi — your network constellation",
   description:
-    "An interactive graph of your professional network: people, shared context, GitHub and Discord signals.",
+    "An interactive graph of your professional network: people, shared context, and GitHub signals.",
 };
 
 export const viewport: Viewport = {
