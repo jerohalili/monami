@@ -14,6 +14,7 @@ import {
   IconFit, IconLink, IconLogo, IconPlus,
   IconSearch, IconSun, IconMoon, IconX, IconZoomIn, IconZoomOut,
 } from "./icons";
+import { ConfirmProvider } from "./ConfirmDialog";
 
 function getInitialTheme(): "dark" | "light" {
   if (typeof window === "undefined") return "dark";
@@ -32,6 +33,7 @@ export default function NetworkApp() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [showAddEdge, setShowAddEdge] = useState(false);
+  const [pendingPlacement, setPendingPlacement] = useState<{ id: string; name: string } | null>(null);
   const apiRef = useRef<GraphApi | null>(null);
 
   // --- Data fetching ---
@@ -76,10 +78,7 @@ export default function NetworkApp() {
     if (!q || !data) return null;
     const s = new Set<string>();
     for (const p of data.people) {
-      const hay = [
-        p.name, p.nickname ?? "", p.headline ?? "", p.company ?? "",
-        ...p.skills, ...p.interests, ...p.tags,
-      ].join(" ").toLowerCase();
+      const hay = [p.name, p.nickname ?? ""].join(" ").toLowerCase();
       if (hay.includes(q)) s.add(p.id);
     }
     return s;
@@ -129,6 +128,7 @@ export default function NetworkApp() {
   const empty = data !== null && data.people.length === 0;
 
   return (
+    <ConfirmProvider>
     <div className="relative h-dvh overflow-hidden">
       <GraphView
         data={data ?? { people: [], edges: [] }}
@@ -138,6 +138,13 @@ export default function NetworkApp() {
         onSelectPerson={selectPerson}
         onSelectEdge={selectEdge}
         apiRef={apiRef}
+        pendingPlacement={pendingPlacement}
+        onPlaceNode={async () => {
+          const p = pendingPlacement;
+          setPendingPlacement(null);
+          await load();
+          if (p) selectPerson(p.id);
+        }}
       />
 
       {/* Header bar */}
@@ -226,17 +233,19 @@ export default function NetworkApp() {
 
       {/* Details sidebar */}
       {(selectedPerson || selectedEdge) && (
-        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] space-y-4 overflow-y-auto rounded-t-2xl p-4 shadow-2xl backdrop-blur-md sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[400px] sm:rounded-none sm:rounded-l-2xl lg:w-[430px]" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
-          <DetailsPanel
-            person={selectedPerson}
-            edge={selectedEdge}
-            data={data!}
-            onClose={() => { selectPerson(null); setSelectedEdgeId(null); }}
-            onSelectPerson={(id) => selectPerson(id)}
-            onChanged={async () => { await load(); }}
-            onClearedSelection={() => selectPerson(null)}
-            onEditEdgeSelected={selectPerson}
-          />
+        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md sm:bottom-4 sm:top-4 sm:left-auto sm:right-4 sm:max-h-none sm:w-[400px] sm:overflow-y-auto sm:rounded-2xl lg:w-[430px]" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+          <div className="space-y-4 p-4">
+            <DetailsPanel
+              person={selectedPerson}
+              edge={selectedEdge}
+              data={data!}
+              onClose={() => { selectPerson(null); setSelectedEdgeId(null); }}
+              onSelectPerson={(id) => selectPerson(id)}
+              onChanged={async () => { await load(); }}
+              onClearedSelection={() => selectPerson(null)}
+              onEditEdgeSelected={selectPerson}
+            />
+          </div>
         </aside>
       )}
 
@@ -263,7 +272,11 @@ export default function NetworkApp() {
       {showAddPerson && data && (
         <AddPersonModal
           onClose={() => setShowAddPerson(false)}
-          onCreated={(person: Person) => { setShowAddPerson(false); load().then(() => selectPerson(person.id)); }}
+          onCreated={async (person: Person) => {
+            setShowAddPerson(false);
+            await load();
+            setPendingPlacement({ id: person.id, name: person.name });
+          }}
         />
       )}
       {showAddEdge && data && (
@@ -275,5 +288,6 @@ export default function NetworkApp() {
         />
       )}
     </div>
+    </ConfirmProvider>
   );
 }

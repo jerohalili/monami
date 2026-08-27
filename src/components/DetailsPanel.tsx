@@ -9,7 +9,8 @@ import {
   ORIGINS, colorForName, initialsOf, overlap,
   type GraphPayload, type Person, type Relationship,
 } from "@/lib/model";
-import { IconExternal, IconPencil, IconTrash } from "./icons";
+import { IconExternal, IconPencil, IconTrash, IconX } from "./icons";
+import { useConfirm } from "./ConfirmDialog";
 import {
   EMPTY_PERSON_FORM, PersonFormFields, formToPersonPayload, personToForm,
   type PersonFormState,
@@ -67,10 +68,7 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
 
   return (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <button className="rounded-lg p-1 text-xs hover:opacity-80" style={{ color: "var(--text-dim)" }} onClick={onClose}>Close</button>
-      </div>
-      <div className="mt-1 flex items-start gap-4">
+      <div className="flex items-start gap-4">
         <Avatar p={person} size={64} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-lg font-semibold" style={{ color: "var(--text)" }}>
@@ -86,6 +84,9 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
             </p>
           )}
         </div>
+        <button className="shrink-0 rounded-lg p-1 transition hover:opacity-80" style={{ color: "var(--text-dim)" }} onClick={onClose} aria-label="Close">
+          <IconX width={18} height={18} />
+        </button>
       </div>
 
       <div className="mt-3 flex gap-2">
@@ -189,7 +190,12 @@ function EdgeView({ edge, data, onClose, onSelectPerson, onEditClick, onDelete }
 
   return (
     <>
-      <button className="rounded-lg p-1 text-xs hover:opacity-80" style={{ color: "var(--text-dim)" }} onClick={onClose}>Close</button>
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>Connection details</div>
+        <button className="shrink-0 rounded-lg p-1 transition hover:opacity-80" style={{ color: "var(--text-dim)" }} onClick={onClose} aria-label="Close">
+          <IconX width={18} height={18} />
+        </button>
+      </div>
 
       {/* People */}
       <div className="mt-1 flex items-center gap-3 rounded-xl p-3" style={{ border: "1px solid var(--border)", background: "var(--bg-hover)" }}>
@@ -286,6 +292,7 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
 }) {
   const [form, setForm] = useState<EdgeFormState>(edgeToForm(edge));
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
   const source = data.people.find((p) => p.id === edge.sourceId);
   const target = data.people.find((p) => p.id === edge.targetId);
 
@@ -301,7 +308,7 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
   };
 
   const remove = async () => {
-    if (!window.confirm(`Remove the connection between ${source?.name} and ${target?.name}?`)) return;
+    if (!(await confirm(`Remove the connection between ${source?.name} and ${target?.name}?`))) return;
     setSaving(true);
     await fetch(`/api/edges/${edge.id}`, { method: "DELETE" });
     await onDeleted();
@@ -350,6 +357,7 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
   const [edgeEditing, setEdgeEditing] = useState(false);
   const [form, setForm] = useState<PersonFormState>(EMPTY_PERSON_FORM);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
 
   // Reset editing when selection changes
   useEffect(() => { setPersonEditing(false); setEdgeEditing(false); }, [person?.id, edge?.id]);
@@ -374,7 +382,7 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
           onDelete={async () => {
             const source = data.people.find((p) => p.id === edge.sourceId);
             const target = data.people.find((p) => p.id === edge.targetId);
-            if (!window.confirm(`Remove the connection between ${source?.name} and ${target?.name}?`)) return;
+            if (!(await confirm(`Remove the connection between ${source?.name} and ${target?.name}?`))) return;
             await fetch(`/api/edges/${edge.id}`, { method: "DELETE" });
             await onChanged();
           }}
@@ -419,7 +427,7 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
         onSelectPerson={(id) => onEditEdgeSelected(id)}
         onEditClick={() => { setForm(personToForm(person)); setPersonEditing(true); }}
         onDelete={async () => {
-          if (!window.confirm(`Remove ${person.name} and all their connections?`)) return;
+          if (!(await confirm(`Remove ${person.name} and all their connections?`))) return;
           await fetch(`/api/people/${person.id}`, { method: "DELETE" });
           onClearedSelection();
           await onChanged();
