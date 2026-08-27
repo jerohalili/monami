@@ -77,13 +77,15 @@ export default function GraphView({
 
   // Expose zoom/fit methods via apiRef.
   useEffect(() => {
-    const fg = () =>
-      fgRef.current as unknown as
-        | { zoomIn?: (t?: number) => void; zoomOut?: (t?: number) => void }
-        | undefined;
     apiRef.current = {
-      zoomIn: (t) => fg()?.zoomIn?.(t ?? 120),
-      zoomOut: (t) => fg()?.zoomOut?.(t ?? 120),
+      zoomIn: (t) => {
+        const g = fgRef.current;
+        if (g) g.zoom(g.zoom() * 1.3, t ?? 200);
+      },
+      zoomOut: (t) => {
+        const g = fgRef.current;
+        if (g) g.zoom(g.zoom() / 1.3, t ?? 200);
+      },
       fit: (t) => fgRef.current?.zoomToFit(t ?? 400, 90),
     };
     return () => { apiRef.current = null; };
@@ -150,6 +152,17 @@ export default function GraphView({
 
   const radiusOf = (n: GNode) =>
     5 + Math.min(n.degree, 10) * 0.9 + (n.isSelf ? 4 : 0);
+
+  // Define clickable hit area for each node (required when nodeCanvasObjectMode is "replace").
+  const paintPointerArea = (raw: object, color: string, ctx: CanvasRenderingContext2D, _globalScale: number) => {
+    const n = raw as GNode;
+    if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) return;
+    const r = radiusOf(n) + 4; // small padding for easier targeting
+    ctx.beginPath();
+    ctx.arc(n.x!, n.y!, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  };
 
   // --- Node painter ---
 
@@ -263,14 +276,79 @@ export default function GraphView({
     return hexToRgba(base, hoverLink?.id === e.id ? 0.95 : 0.45);
   };
 
+  // Base width scales with strength: weak=1.5, normal=2.5, strong=3.5.
+  const baseWidth = (strength: number) => [1.5, 2.5, 3.5][Math.min(Math.max(strength, 1), 3) - 1] ?? 2.5;
+
   const linkWidthFn = (raw: object) => {
     const e = raw as Relationship & { source: unknown; target: unknown };
     const sid = lid(e.source);
     const tid = lid(e.target);
-    if (e.id === selectedEdgeId) return 3.5;
-    if (selectedPersonId && (sid === selectedPersonId || tid === selectedPersonId)) return 2.5;
-    if (hoverLink?.id === e.id) return 3;
-    return 1.2;
+    const base = baseWidth(e.strength);
+    if (e.id === selectedEdgeId) return base + 2;
+    if (selectedPersonId && (sid === selectedPersonId || tid === selectedPersonId)) return base + 0.8;
+    if (hoverLink?.id === e.id) return base + 1;
+    return base;
+  };
+
+  // Dashed lines for weak ties (strength=1), more dashes for visibility.
+  const linkLineDashFn = (raw: object) => {
+    const e = raw as Relationship;
+    return e.strength <= 1 ? [8, 5] : null;
+  };
+
+  // Custom link painting: glow for selected, double lines for strong.
+  const paintCustomLink = (raw: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    const e = raw as Relationship & { source: { x?: number; y?: number }; target: { x?: number; y?: number } };
+    if (!Number.isFinite(e.source?.x) || !Number.isFinite(e.target?.x)) return;
+
+    const sx = e.source.x!;
+    const sy = e.source.y!;
+    const tx = e.target.x!;
+    const ty = e.target.y!;
+    const base = ORIGINS[e.origin]?.color ?? "#94a3b8";
+
+    // Glow behind selected edges
+    if (e.id === selectedEdgeId) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(tx, ty);
+      ctx.strokeStyle = hexToRgba(base, 0.25);
+      ctx.lineWidth = baseWidth(e.strength) + 8 / globalScale;
+      ctx.lineCap = "round";
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Double parallel lines for strong edges (strength=3)
+    if (e.strength === 3) {
+      const dx = tx - sx;
+      const dy = ty - sy;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1) return;
+      const nx = -dy / len;
+      const ny = dx / len;
+      const gap = 2.5 / globalScale;
+
+      ctx.save();
+      ctx.strokeStyle = hexToRgba(base, e.id === selectedEdgeId ? 1 : 0.45);
+      ctx.lineWidth = 1.2 / globalScale;
+      ctx.lineCap = "round";
+
+      // First parallel line
+      ctx.beginPath();
+      ctx.moveTo(sx + nx * gap, sy + ny * gap);
+      ctx.lineTo(tx + nx * gap, ty + ny * gap);
+      ctx.stroke();
+
+      // Second parallel line
+      ctx.beginPath();
+      ctx.moveTo(sx - nx * gap, sy - ny * gap);
+      ctx.lineTo(tx - nx * gap, ty - ny * gap);
+      ctx.stroke();
+
+      ctx.restore();
+    }
   };
 
   const personById = useMemo(() => {
@@ -303,10 +381,14 @@ export default function GraphView({
           nodeRelSize={4}
           nodeCanvasObject={paintNode}
           nodeCanvasObjectMode={() => "replace"}
+          nodePointerAreaPaint={paintPointerArea}
           nodeLabel={() => ""}
           linkLabel={() => ""}
           linkColor={linkColorFn}
           linkWidth={linkWidthFn}
+          linkLineDash={linkLineDashFn}
+          linkCanvasObject={paintCustomLink}
+          linkCanvasObjectMode={() => "before"}
           onNodeClick={(n: object) => onSelectPerson((n as GNode).id)}
           onNodeHover={(n: object | null) => setHoverNode(n ? (n as GNode).id : null)}
           onLinkClick={(l: object) => onSelectEdge((l as Relationship).id)}
@@ -319,20 +401,23 @@ export default function GraphView({
       {/* Hover tooltip for links */}
       {hoverLink && (
         <div
-          className="pointer-events-none absolute z-20 max-w-[280px] rounded-xl border border-white/15 bg-[#0b101d]/95 px-3 py-2 text-xs shadow-xl backdrop-blur"
+          className="pointer-events-none absolute z-20 max-w-[280px] rounded-xl px-3 py-2 text-xs shadow-xl backdrop-blur"
           style={{
             left: Math.min(tipPos.x + 16, size.w - 300 > 0 ? tipPos.x + 16 : Math.max(8, size.w - 296)),
             top: tipPos.y + 16,
+            border: "1px solid var(--border-strong)",
+            background: "var(--bg-card)",
+            color: "var(--text)",
           }}
         >
-          <div className="flex items-center gap-1.5 font-semibold text-slate-100">
+          <div className="flex items-center gap-1.5 font-semibold">
             <span className="inline-block h-2 w-2 rounded-full" style={{ background: ORIGINS[hoverLink.origin].color }} />
             {personById.get(hoverLink.sourceId)?.name ?? "?"} ↔{" "}
             {personById.get(hoverLink.targetId)?.name ?? "?"}
           </div>
-          <div className="mt-0.5 text-slate-400">{ORIGINS[hoverLink.origin].label}</div>
+          <div className="mt-0.5" style={{ color: "var(--text-muted)" }}>{ORIGINS[hoverLink.origin].label}</div>
           {hoverLink.context && (
-            <div className="mt-1.5 line-clamp-4 leading-snug text-slate-300">{hoverLink.context}</div>
+            <div className="mt-1.5 line-clamp-4 leading-snug" style={{ color: "var(--text-muted)" }}>{hoverLink.context}</div>
           )}
           {(hoverLink.communities.length > 0 || hoverLink.projects.length > 0) && (
             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -348,7 +433,7 @@ export default function GraphView({
       )}
 
       {selectedEdge && (
-        <div className="absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 rounded-full border border-white/15 bg-[#0b101d]/90 px-3 py-1.5 text-xs text-slate-400 backdrop-blur sm:block">
+        <div className="absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 rounded-full px-3 py-1.5 text-xs backdrop-blur sm:block" style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}>
           Click the connection card to edit · click empty space to deselect
         </div>
       )}

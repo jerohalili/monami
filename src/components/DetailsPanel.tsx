@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ORIGINS, colorForName, initialsOf, overlap,
   type GraphPayload, type Person, type Relationship,
@@ -23,11 +23,11 @@ import {
 function Avatar({ p, size = 56 }: { p: Pick<Person, "name" | "avatarUrl" | "isSelf">; size?: number }) {
   return p.avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={p.avatarUrl} alt={p.name} width={size} height={size} className="rounded-full border border-white/15 object-cover" style={{ width: size, height: size }} />
+    <img src={p.avatarUrl} alt={p.name} width={size} height={size} className="rounded-full object-cover" style={{ width: size, height: size, border: "1px solid var(--border-strong)" }} />
   ) : (
     <div
-      className="flex items-center justify-center rounded-full font-semibold text-[#0b101d]"
-      style={{ width: size, height: size, background: p.isSelf ? "#fbbf24" : colorForName(p.name), fontSize: size * 0.36 }}
+      className="flex items-center justify-center rounded-full font-semibold"
+      style={{ width: size, height: size, background: p.isSelf ? "#fbbf24" : colorForName(p.name), fontSize: size * 0.36, color: "#0b101d" }}
     >
       {initialsOf(p.name)}
     </div>
@@ -68,20 +68,20 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
   return (
     <>
       <div className="flex items-start justify-between gap-2">
-        <button className="rounded-lg p-1 text-xs text-slate-500 hover:text-slate-200" onClick={onClose}>Close</button>
+        <button className="rounded-lg p-1 text-xs hover:opacity-80" style={{ color: "var(--text-dim)" }} onClick={onClose}>Close</button>
       </div>
       <div className="mt-1 flex items-start gap-4">
         <Avatar p={person} size={64} />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-lg font-semibold text-white">
+          <h2 className="truncate text-lg font-semibold" style={{ color: "var(--text)" }}>
             {person.name}
             {person.isSelf && (
               <span className="ml-2 rounded-full bg-amber-400/15 px-2 py-0.5 align-middle text-[10px] font-medium uppercase tracking-wider text-amber-300">You</span>
             )}
           </h2>
-          {person.headline && <p className="text-sm text-slate-300">{person.headline}</p>}
+          {person.headline && <p className="text-sm" style={{ color: "var(--text)" }}>{person.headline}</p>}
           {(person.company || person.location) && (
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>
               {[person.company, person.location].filter(Boolean).join(" · ")}
             </p>
           )}
@@ -97,8 +97,8 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
 
       {/* Contact links */}
       {(person.email || person.githubLogin) && (
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
-          {person.email && <a href={`mailto:${person.email}`} className="block truncate text-slate-300 hover:text-white">{person.email}</a>}
+        <div className="mt-3 rounded-xl p-3 text-sm" style={{ border: "1px solid var(--border)", background: "var(--bg-hover)" }}>
+          {person.email && <a href={`mailto:${person.email}`} className="block truncate hover:opacity-80" style={{ color: "var(--text)" }}>{person.email}</a>}
           {person.githubLogin && (
             <a href={`https://github.com/${person.githubLogin}`} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1.5 truncate text-violet-300 hover:text-violet-200">
               github.com/{person.githubLogin} <IconExternal width={12} height={12} />
@@ -154,7 +154,7 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
       {person.notes && (
         <div>
           <div className="label">Notes</div>
-          <p className="whitespace-pre-wrap rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm leading-relaxed text-slate-300">{person.notes}</p>
+          <p className="whitespace-pre-wrap rounded-xl p-3 text-sm leading-relaxed" style={{ border: "1px solid var(--border)", background: "var(--bg-hover)", color: "var(--text)" }}>{person.notes}</p>
         </div>
       )}
 
@@ -169,6 +169,107 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
           ))}
         </Section>
       )}
+    </>
+  );
+}
+
+// --- Edge details (read-only) ---
+
+function EdgeView({ edge, data, onClose, onSelectPerson, onEditClick, onDelete }: {
+  edge: Relationship;
+  data: GraphPayload;
+  onClose: () => void;
+  onSelectPerson: (id: string) => void;
+  onEditClick: () => void;
+  onDelete: () => void;
+}) {
+  const source = data.people.find((p) => p.id === edge.sourceId);
+  const target = data.people.find((p) => p.id === edge.targetId);
+  const sharedTags = source && target ? overlap(source.tags.filter((t) => t !== "me"), target.tags) : [];
+
+  return (
+    <>
+      <button className="rounded-lg p-1 text-xs hover:opacity-80" style={{ color: "var(--text-dim)" }} onClick={onClose}>Close</button>
+
+      {/* People */}
+      <div className="mt-1 flex items-center gap-3 rounded-xl p-3" style={{ border: "1px solid var(--border)", background: "var(--bg-hover)" }}>
+        <button className="flex items-center gap-2 truncate text-sm font-semibold hover:underline" style={{ color: "var(--text)" }} onClick={() => onSelectPerson(edge.sourceId)}>
+          <Avatar p={{ name: source?.name ?? "?", avatarUrl: source?.avatarUrl ?? null, isSelf: false }} size={32} />
+          <span className="truncate">{source?.name ?? "?"}</span>
+        </button>
+        <span className="shrink-0 px-1 text-xs" style={{ color: ORIGINS[edge.origin].color }}>↔</span>
+        <button className="flex items-center gap-2 truncate text-sm font-semibold hover:underline" style={{ color: "var(--text)" }} onClick={() => onSelectPerson(edge.targetId)}>
+          <Avatar p={{ name: target?.name ?? "?", avatarUrl: target?.avatarUrl ?? null, isSelf: false }} size={32} />
+          <span className="truncate">{target?.name ?? "?"}</span>
+        </button>
+      </div>
+
+      {/* Origin */}
+      <div>
+        <div className="label">Origin</div>
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ background: ORIGINS[edge.origin].color + "20", color: ORIGINS[edge.origin].color }}>
+          <span className="h-2 w-2 rounded-full" style={{ background: ORIGINS[edge.origin].color }} />
+          {ORIGINS[edge.origin].label}
+        </span>
+      </div>
+
+      {/* Strength */}
+      <div>
+        <div className="label">Strength</div>
+        <div className="flex gap-1.5">
+          {([1, 2, 3] as const).map((s) => (
+            <span key={s} className="inline-block h-2.5 rounded-full transition-all" style={{
+              width: s === 1 ? 16 : s === 2 ? 32 : 48,
+              background: s <= edge.strength ? "var(--text)" : "var(--border)",
+            }} />
+          ))}
+        </div>
+        <div className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>{["Weak", "Normal", "Strong"][edge.strength - 1]}</div>
+      </div>
+
+      {/* Context */}
+      {edge.context && (
+        <div>
+          <div className="label">Context</div>
+          <p className="whitespace-pre-wrap rounded-xl p-3 text-sm leading-relaxed" style={{ border: "1px solid var(--border)", background: "var(--bg-hover)", color: "var(--text)" }}>{edge.context}</p>
+        </div>
+      )}
+
+      {/* Communities */}
+      {edge.communities.length > 0 && (
+        <div>
+          <div className="label">Communities</div>
+          <div className="flex flex-wrap gap-1.5">
+            {edge.communities.map((c) => <span key={c} className="chip">{c}</span>)}
+          </div>
+        </div>
+      )}
+
+      {/* Projects */}
+      {edge.projects.length > 0 && (
+        <div>
+          <div className="label">Projects</div>
+          <div className="flex flex-wrap gap-1.5">
+            {edge.projects.map((p) => <span key={p} className="chip border-violet-400/30 text-violet-300">{p}</span>)}
+          </div>
+        </div>
+      )}
+
+      {/* Shared tags */}
+      {sharedTags.length > 0 && (
+        <div>
+          <div className="label">Shared tags</div>
+          <div className="flex flex-wrap gap-1.5">
+            {sharedTags.map((t) => <span key={t} className="chip border-sky-400/30 text-sky-300">#{t}</span>)}
+          </div>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-1">
+        <button className="btn flex-1" onClick={onEditClick}><IconPencil /> Edit</button>
+        <button className="btn text-red-300 hover:bg-red-500/10" onClick={onDelete} title="Delete connection"><IconTrash /></button>
+      </div>
     </>
   );
 }
@@ -245,21 +346,46 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
   onClearedSelection: () => void;
   onEditEdgeSelected: (id: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [personEditing, setPersonEditing] = useState(false);
+  const [edgeEditing, setEdgeEditing] = useState(false);
   const [form, setForm] = useState<PersonFormState>(EMPTY_PERSON_FORM);
   const [saving, setSaving] = useState(false);
 
+  // Reset editing when selection changes
+  useEffect(() => { setPersonEditing(false); setEdgeEditing(false); }, [person?.id, edge?.id]);
+
   if (edge) {
+    if (edgeEditing) {
+      return (
+        <div className="space-y-3">
+          <RelationshipEditor key={edge.id} edge={edge} data={data} onClose={onClose} onChanged={async () => { await onChanged(); setEdgeEditing(false); }} onDeleted={onChanged} onSelectPerson={onSelectPerson} />
+        </div>
+      );
+    }
     return (
       <div className="space-y-3">
-        <RelationshipEditor key={edge.id} edge={edge} data={data} onClose={onClose} onChanged={onChanged} onDeleted={onChanged} onSelectPerson={onSelectPerson} />
+        <EdgeView
+          key={edge.id}
+          edge={edge}
+          data={data}
+          onClose={onClose}
+          onSelectPerson={(id) => onEditEdgeSelected(id)}
+          onEditClick={() => setEdgeEditing(true)}
+          onDelete={async () => {
+            const source = data.people.find((p) => p.id === edge.sourceId);
+            const target = data.people.find((p) => p.id === edge.targetId);
+            if (!window.confirm(`Remove the connection between ${source?.name} and ${target?.name}?`)) return;
+            await fetch(`/api/edges/${edge.id}`, { method: "DELETE" });
+            await onChanged();
+          }}
+        />
       </div>
     );
   }
 
   if (!person) return null;
 
-  if (editing) {
+  if (personEditing) {
     const save = async () => {
       if (!form.name.trim()) return;
       setSaving(true);
@@ -270,11 +396,11 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
       });
       await onChanged();
       setSaving(false);
-      setEditing(false);
+      setPersonEditing(false);
     };
     return (
       <div className="space-y-3">
-        <button className="rounded-lg p-1 text-xs text-slate-500 hover:text-slate-200" onClick={() => setEditing(false)}>Cancel</button>
+        <button className="rounded-lg p-1 text-xs text-slate-500 hover:text-slate-200" onClick={() => setPersonEditing(false)}>Cancel</button>
         <PersonFormFields value={form} onChange={setForm} isNew={false} />
         <button className="btn-primary w-full" onClick={save} disabled={saving || !form.name.trim()}>
           {saving ? "Saving..." : "Save changes"}
@@ -291,7 +417,7 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
         data={data}
         onClose={onClose}
         onSelectPerson={(id) => onEditEdgeSelected(id)}
-        onEditClick={() => { setForm(personToForm(person)); setEditing(true); }}
+        onEditClick={() => { setForm(personToForm(person)); setPersonEditing(true); }}
         onDelete={async () => {
           if (!window.confirm(`Remove ${person.name} and all their connections?`)) return;
           await fetch(`/api/people/${person.id}`, { method: "DELETE" });

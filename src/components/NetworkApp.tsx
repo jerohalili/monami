@@ -12,10 +12,18 @@ import AddPersonModal from "./AddPersonModal";
 import AddConnectionModal from "./AddConnectionModal";
 import {
   IconFit, IconLink, IconLogo, IconPlus,
-  IconSearch, IconX, IconZoomIn, IconZoomOut,
+  IconSearch, IconSun, IconMoon, IconX, IconZoomIn, IconZoomOut,
 } from "./icons";
 
+function getInitialTheme(): "dark" | "light" {
+  if (typeof window === "undefined") return "dark";
+  const stored = localStorage.getItem("theme");
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
 export default function NetworkApp() {
+  const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const [data, setData] = useState<GraphPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +50,12 @@ export default function NetworkApp() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Apply theme to document and persist.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   // --- Selection ---
 
@@ -92,8 +106,8 @@ export default function NetworkApp() {
 
   if (loading && !data) {
     return (
-      <div className="flex h-dvh items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-slate-400">
+      <div className="flex h-dvh items-center justify-center" style={{ color: "var(--text-muted)" }}>
+        <div className="flex flex-col items-center gap-3">
           <IconLogo width={36} height={36} className="animate-pulse text-violet-400" />
           <p className="text-sm">Charting your constellation...</p>
         </div>
@@ -103,9 +117,9 @@ export default function NetworkApp() {
 
   if (error && !data) {
     return (
-      <div className="flex h-dvh items-center justify-center p-6 text-center">
+      <div className="flex h-dvh items-center justify-center p-6 text-center" style={{ color: "var(--text)" }}>
         <div className="space-y-3">
-          <p className="text-sm text-slate-300">{error}</p>
+          <p className="text-sm">{error}</p>
           <button className="btn-primary" onClick={() => { setLoading(true); load(); }}>Retry</button>
         </div>
       </div>
@@ -128,13 +142,13 @@ export default function NetworkApp() {
 
       {/* Header bar */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-wrap items-center gap-2 p-3">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/10 bg-[#0b101d]/80 px-3 py-2 backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-2 backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
           <IconLogo width={20} height={20} className="text-violet-400" />
-          <span className="text-sm font-semibold tracking-tight text-white">
+          <span className="text-sm font-semibold tracking-tight" style={{ color: "var(--text)" }}>
             Mon<span className="text-violet-400">Ami</span>
           </span>
           {data && (
-            <span className="ml-1 hidden text-xs text-slate-500 sm:inline">
+            <span className="ml-1 hidden text-xs sm:inline" style={{ color: "var(--text-dim)" }}>
               {data.people.length} people · {data.edges.length} connections
             </span>
           )}
@@ -142,9 +156,9 @@ export default function NetworkApp() {
 
         {/* Search */}
         <div className="pointer-events-auto relative min-w-[180px] flex-1 sm:max-w-md">
-          <IconSearch width={15} height={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <IconSearch width={15} height={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-dim)" }} />
           <input
-            className="field pl-9"
+            className="field rounded-xl backdrop-blur pl-9"
             placeholder="Search skills, interests, names..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -156,19 +170,23 @@ export default function NetworkApp() {
             }}
           />
           {query && (
-            <button onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 hover:text-white" aria-label="Clear search">
+            <button onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 hover:opacity-80" style={{ color: "var(--text-dim)" }} aria-label="Clear search">
               <IconX width={14} height={14} />
             </button>
           )}
           {matchedIds && (
-            <div className="absolute right-10 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+            <div className="absolute right-10 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-dim)" }}>
               {matchedIds.size} match{matchedIds.size === 1 ? "" : "es"}
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="pointer-events-auto flex gap-2">
+        <div className="pointer-events-auto flex gap-1 rounded-xl p-1 backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+          <button className="btn" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} title="Toggle theme">
+            {theme === "dark" ? <IconSun /> : <IconMoon />}
+          </button>
+          <div className="w-px" style={{ background: "var(--border)" }} />
           <button className="btn" onClick={() => setShowAddEdge(true)} disabled={!data || data.people.length < 2} title="Add connection">
             <IconLink />
             <span className="hidden sm:inline">Connect</span>
@@ -181,25 +199,34 @@ export default function NetworkApp() {
       </header>
 
       {/* Zoom controls */}
-      <div className="absolute bottom-4 right-4 z-30 hidden flex-col gap-1.5 rounded-xl border border-white/10 bg-[#0b101d]/80 p-1.5 backdrop-blur sm:flex">
-        <button className="btn border-transparent bg-transparent px-2 py-1.5" onClick={() => apiRef.current?.zoomIn()} title="Zoom in"><IconZoomIn /></button>
-        <button className="btn border-transparent bg-transparent px-2 py-1.5" onClick={() => apiRef.current?.zoomOut()} title="Zoom out"><IconZoomOut /></button>
-        <button className="btn border-transparent bg-transparent px-2 py-1.5" onClick={() => apiRef.current?.fit()} title="Fit view"><IconFit /></button>
+      <div className="pointer-events-auto absolute bottom-4 right-4 z-30 hidden flex-col gap-1.5 rounded-xl p-1.5 backdrop-blur sm:flex" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+        <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.zoomIn()} title="Zoom in"><IconZoomIn /></button>
+        <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.zoomOut()} title="Zoom out"><IconZoomOut /></button>
+        <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.fit()} title="Fit view"><IconFit /></button>
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-30 hidden max-w-[70%] flex-wrap gap-x-3 gap-y-1 rounded-xl border border-white/10 bg-[#0b101d]/80 px-3 py-2 text-xs text-slate-400 backdrop-blur md:flex">
+      <div className="absolute bottom-4 left-4 z-30 hidden max-w-[80%] flex-wrap gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-xs backdrop-blur md:flex" style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}>
         {Object.entries(ORIGINS).map(([k, v]) => (
           <span key={k} className="inline-flex items-center gap-1.5">
             <span className="inline-block h-2 w-2 rounded-full" style={{ background: v.color }} />
             {v.label}
           </span>
         ))}
+        <span className="ml-1 inline-flex items-center gap-1 pl-2" style={{ borderLeft: "1px solid var(--border)" }}>
+          <span className="inline-block h-0 w-3 border-t border-dashed" style={{ borderColor: "var(--text-muted)" }} /> weak
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-0 w-3 border-t-2" style={{ borderColor: "var(--text-muted)" }} /> normal
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-0 w-3 border-t-[3px]" style={{ borderColor: "var(--text-muted)" }} /> strong
+        </span>
       </div>
 
       {/* Details sidebar */}
       {(selectedPerson || selectedEdge) && (
-        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] space-y-4 overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0b101d]/95 p-4 shadow-2xl backdrop-blur-md sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[400px] sm:rounded-none sm:rounded-l-2xl lg:w-[430px]">
+        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] space-y-4 overflow-y-auto rounded-t-2xl p-4 shadow-2xl backdrop-blur-md sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[400px] sm:rounded-none sm:rounded-l-2xl lg:w-[430px]" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
           <DetailsPanel
             person={selectedPerson}
             edge={selectedEdge}
@@ -216,10 +243,10 @@ export default function NetworkApp() {
       {/* Empty state */}
       {empty && (
         <div className="absolute inset-0 z-20 flex items-center justify-center p-6">
-          <div className="w-full max-w-sm space-y-4 rounded-2xl border border-white/10 bg-[#0b101d]/90 p-6 text-center shadow-2xl backdrop-blur">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl p-6 text-center shadow-2xl backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
             <IconLogo width={40} height={40} className="mx-auto text-violet-400" />
-            <h1 className="text-lg font-semibold text-white">Your sky is empty</h1>
-            <p className="text-sm leading-relaxed text-slate-400">
+            <h1 className="text-lg font-semibold" style={{ color: "var(--text)" }}>Your sky is empty</h1>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
               Add the first person to your constellation, or load a sample network to explore what MonAmi can do.
             </p>
             <div className="flex flex-col gap-2">
