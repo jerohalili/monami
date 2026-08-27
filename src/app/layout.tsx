@@ -1,11 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import AuthProvider from "@/components/AuthProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "MonAmi — your network constellation",
   description:
-    "An interactive graph of your professional network: people, shared context, and GitHub signals.",
+    "An interactive graph of your professional network: people, shared context, and connections.",
 };
 
 export const viewport: Viewport = {
@@ -19,9 +18,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        <AuthProvider>{children}</AuthProvider>
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

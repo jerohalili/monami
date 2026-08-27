@@ -1,12 +1,13 @@
+// GET /api/edges — list all edges.
+// POST /api/edges — create a new edge between two people.
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { edgeDTO, toStringArrayInput } from "@/lib/dto";
 import { ORIGIN_KEYS, type Origin } from "@/lib/model";
 
 function parseOrigin(v: unknown): Origin | null {
-  return typeof v === "string" && (ORIGIN_KEYS as string[]).includes(v)
-    ? (v as Origin)
-    : null;
+  return typeof v === "string" && (ORIGIN_KEYS as string[]).includes(v) ? (v as Origin) : null;
 }
 
 export async function GET() {
@@ -23,16 +24,10 @@ export async function POST(req: NextRequest) {
   const sourceId = typeof r.sourceId === "string" ? r.sourceId : "";
   const targetId = typeof r.targetId === "string" ? r.targetId : "";
   if (!sourceId || !targetId) {
-    return NextResponse.json(
-      { error: "Both people are required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Both people are required" }, { status: 400 });
   }
   if (sourceId === targetId) {
-    return NextResponse.json(
-      { error: "A person cannot be connected to themselves" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "A person cannot be connected to themselves" }, { status: 400 });
   }
   const strengthRaw = Number(r.strength);
   let metAt: Date | null = null;
@@ -46,10 +41,7 @@ export async function POST(req: NextRequest) {
       db.person.findUnique({ where: { id: targetId } }),
     ]);
     if (!source || !target) {
-      return NextResponse.json(
-        { error: "Person not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Person not found" }, { status: 404 });
     }
     const edge = await db.edge.create({
       data: {
@@ -59,18 +51,12 @@ export async function POST(req: NextRequest) {
         context: typeof r.context === "string" ? r.context.trim() || null : null,
         communities: toStringArrayInput(r.communities),
         projects: toStringArrayInput(r.projects),
-        strength:
-          Number.isFinite(strengthRaw) && strengthRaw >= 1 && strengthRaw <= 3
-            ? Math.round(strengthRaw)
-            : 2,
+        strength: Number.isFinite(strengthRaw) && strengthRaw >= 1 && strengthRaw <= 3 ? Math.round(strengthRaw) : 2,
         metAt,
       },
     });
     return NextResponse.json(edgeDTO(edge), { status: 201 });
   } catch {
-    return NextResponse.json(
-      { error: "These two are already connected" },
-      { status: 409 }
-    );
+    return NextResponse.json({ error: "These two are already connected" }, { status: 409 });
   }
 }

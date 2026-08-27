@@ -1,23 +1,17 @@
+// GET /api/people/[id] — fetch a single person.
+// PATCH /api/people/[id] — update a person.
+// DELETE /api/people/[id] — delete a person.
+
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import {
-  personDTO,
-  toLinksInput,
-  toStringArrayInput,
-} from "@/lib/dto";
+import { personDTO, toLinksInput, toStringArrayInput } from "@/lib/dto";
 
 type Params = { params: Promise<{ id: string }> };
 
 const OPTIONAL_STRINGS = [
-  "nickname",
-  "avatarUrl",
-  "headline",
-  "company",
-  "location",
-  "email",
-  "notes",
-  "githubLogin",
+  "nickname", "avatarUrl", "headline", "company",
+  "location", "email", "notes", "githubLogin",
 ] as const;
 
 function optionalString(v: unknown): string | null {
@@ -56,10 +50,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const person = await db.person.update({ where: { id }, data });
     return NextResponse.json(personDTO(person));
   } catch (e) {
-    if (
-      e instanceof Prisma.PrismaClientKnownRequestError &&
-      e.code === "P2025"
-    ) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ error: "Update failed" }, { status: 500 });
@@ -72,10 +63,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     await db.person.delete({ where: { id } });
     return new NextResponse(null, { status: 204 });
   } catch (e) {
-    if (
-      e instanceof Prisma.PrismaClientKnownRequestError &&
-      e.code === "P2025"
-    ) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });

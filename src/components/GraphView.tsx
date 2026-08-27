@@ -1,3 +1,6 @@
+// Force-directed graph canvas rendered with react-force-graph-2d.
+// Handles node/link painting, hover tooltips, selection highlighting, and zoom controls.
+
 "use client";
 
 import dynamic from "next/dynamic";
@@ -13,9 +16,9 @@ import {
   type Relationship,
 } from "@/lib/model";
 
-const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
-  ssr: false,
-});
+const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
+
+// --- Types ---
 
 export interface GraphApi {
   zoomIn: (ms?: number) => void;
@@ -29,9 +32,12 @@ interface GNode extends Person {
   y?: number;
 }
 
+/** Extract the string id from a node/link ref (force-graph mutates these). */
 function lid(x: unknown): string {
   return typeof x === "object" && x !== null ? (x as { id: string }).id : String(x);
 }
+
+// --- Component ---
 
 export default function GraphView({
   data,
@@ -59,17 +65,17 @@ export default function GraphView({
   const [, bumpTick] = useState(0);
   const avatarCache = useRef(new Map<string, HTMLImageElement>());
 
+  // Track container size.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      setSize({ w: el.clientWidth, h: el.clientHeight });
-    });
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
     ro.observe(el);
     setSize({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
   }, []);
 
+  // Expose zoom/fit methods via apiRef.
   useEffect(() => {
     const fg = () =>
       fgRef.current as unknown as
@@ -80,11 +86,10 @@ export default function GraphView({
       zoomOut: (t) => fg()?.zoomOut?.(t ?? 120),
       fit: (t) => fgRef.current?.zoomToFit(t ?? 400, 90),
     };
-    return () => {
-      apiRef.current = null;
-    };
+    return () => { apiRef.current = null; };
   }, [apiRef]);
 
+  // Build graph data with degree counts.
   const graphData = useMemo(() => {
     const degree: Record<string, number> = {};
     for (const e of data.edges) {
@@ -97,6 +102,7 @@ export default function GraphView({
     };
   }, [data]);
 
+  // Auto-fit once nodes settle.
   useEffect(() => {
     let tries = 0;
     const iv = setInterval(() => {
@@ -106,16 +112,13 @@ export default function GraphView({
         graphData.nodes.every((n) => Number.isFinite((n as GNode).x));
       if ((settled && tries >= 3) || tries >= 32) {
         clearInterval(iv);
-        try {
-          fgRef.current?.zoomToFit(700, 110);
-        } catch {
-          void 0;
-        }
+        try { fgRef.current?.zoomToFit(700, 110); } catch { /* noop */ }
       }
     }, 250);
     return () => clearInterval(iv);
   }, [graphData]);
 
+  // Neighbor set for the selected person.
   const neighborIds = useMemo(() => {
     if (!selectedPersonId) return null;
     const s = new Set<string>();
@@ -128,8 +131,10 @@ export default function GraphView({
 
   const selectedEdge = useMemo(
     () => data.edges.find((e) => e.id === selectedEdgeId) ?? null,
-    [data.edges, selectedEdgeId]
+    [data.edges, selectedEdgeId],
   );
+
+  // --- Canvas helpers ---
 
   function ensureAvatar(url: string): HTMLImageElement | undefined {
     const cached = avatarCache.current.get(url);
@@ -146,6 +151,8 @@ export default function GraphView({
   const radiusOf = (n: GNode) =>
     5 + Math.min(n.degree, 10) * 0.9 + (n.isSelf ? 4 : 0);
 
+  // --- Node painter ---
+
   const paintNode = (raw: object, ctx: CanvasRenderingContext2D, scale: number) => {
     const n = raw as GNode;
     if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) return;
@@ -159,10 +166,12 @@ export default function GraphView({
     ctx.save();
     ctx.globalAlpha = alpha;
 
+    // Glow for selected / hovered / neighbor nodes.
     if (isSel || isNb || isHover) {
       ctx.shadowColor = "#8b5cf6";
       ctx.shadowBlur = isSel ? 20 : 10;
     }
+    // Selection ring.
     if (isSel) {
       ctx.beginPath();
       ctx.arc(n.x!, n.y!, r + 5 / scale, 0, Math.PI * 2);
@@ -173,6 +182,7 @@ export default function GraphView({
     const cx = n.x!;
     const cy = n.y!;
 
+    // Draw avatar image or fallback circle with initials.
     let drewAvatar = false;
     if (n.avatarUrl) {
       const img = ensureAvatar(n.avatarUrl);
@@ -204,6 +214,7 @@ export default function GraphView({
     }
     ctx.shadowBlur = 0;
 
+    // Border ring.
     if (n.isSelf || isSel) {
       ctx.beginPath();
       ctx.arc(cx, cy, r + 2.5 / scale, 0, Math.PI * 2);
@@ -218,6 +229,7 @@ export default function GraphView({
       ctx.stroke();
     }
 
+    // Label below the node.
     if (!dimmed) {
       const fs = 12 / scale;
       ctx.font = `${fs}px system-ui, sans-serif`;
@@ -234,6 +246,8 @@ export default function GraphView({
     ctx.restore();
   };
 
+  // --- Link styling ---
+
   const linkColorFn = (raw: object) => {
     const e = raw as Relationship & { source: unknown; target: unknown };
     const sid = lid(e.source);
@@ -244,8 +258,7 @@ export default function GraphView({
       (selectedPersonId && (sid === selectedPersonId || tid === selectedPersonId));
     if (touchesSelection) return base;
     if (matchedIds) {
-      const bothMatched = matchedIds.has(sid) && matchedIds.has(tid);
-      if (!bothMatched) return hexToRgba(base, 0.06);
+      if (!(matchedIds.has(sid) && matchedIds.has(tid))) return hexToRgba(base, 0.06);
     }
     return hexToRgba(base, hoverLink?.id === e.id ? 0.95 : 0.45);
   };
@@ -255,11 +268,7 @@ export default function GraphView({
     const sid = lid(e.source);
     const tid = lid(e.target);
     if (e.id === selectedEdgeId) return 3.5;
-    if (
-      selectedPersonId &&
-      (sid === selectedPersonId || tid === selectedPersonId)
-    )
-      return 2.5;
+    if (selectedPersonId && (sid === selectedPersonId || tid === selectedPersonId)) return 2.5;
     if (hoverLink?.id === e.id) return 3;
     return 1.2;
   };
@@ -269,6 +278,8 @@ export default function GraphView({
     for (const p of data.people) m.set(p.id, p);
     return m;
   }, [data.people]);
+
+  // --- Render ---
 
   return (
     <div
@@ -300,13 +311,12 @@ export default function GraphView({
           onNodeHover={(n: object | null) => setHoverNode(n ? (n as GNode).id : null)}
           onLinkClick={(l: object) => onSelectEdge((l as Relationship).id)}
           onLinkHover={(l: object | null) => setHoverLink(l ? (l as Relationship) : null)}
-          onBackgroundClick={() => {
-            onSelectPerson(null);
-            onSelectEdge(null);
-          }}
+          onBackgroundClick={() => { onSelectPerson(null); onSelectEdge(null); }}
           cooldownTime={3500}
         />
       )}
+
+      {/* Hover tooltip for links */}
       {hoverLink && (
         <div
           className="pointer-events-none absolute z-20 max-w-[280px] rounded-xl border border-white/15 bg-[#0b101d]/95 px-3 py-2 text-xs shadow-xl backdrop-blur"
@@ -316,35 +326,27 @@ export default function GraphView({
           }}
         >
           <div className="flex items-center gap-1.5 font-semibold text-slate-100">
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ background: ORIGINS[hoverLink.origin].color }}
-            />
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: ORIGINS[hoverLink.origin].color }} />
             {personById.get(hoverLink.sourceId)?.name ?? "?"} ↔{" "}
             {personById.get(hoverLink.targetId)?.name ?? "?"}
           </div>
           <div className="mt-0.5 text-slate-400">{ORIGINS[hoverLink.origin].label}</div>
           {hoverLink.context && (
-            <div className="mt-1.5 line-clamp-4 leading-snug text-slate-300">
-              {hoverLink.context}
-            </div>
+            <div className="mt-1.5 line-clamp-4 leading-snug text-slate-300">{hoverLink.context}</div>
           )}
           {(hoverLink.communities.length > 0 || hoverLink.projects.length > 0) && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {hoverLink.communities.map((c) => (
-                <span key={c} className="chip">
-                  {c}
-                </span>
+                <span key={c} className="chip">{c}</span>
               ))}
               {hoverLink.projects.map((p) => (
-                <span key={p} className="chip border-violet-400/30 text-violet-300">
-                  {p}
-                </span>
+                <span key={p} className="chip border-violet-400/30 text-violet-300">{p}</span>
               ))}
             </div>
           )}
         </div>
       )}
+
       {selectedEdge && (
         <div className="absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 rounded-full border border-white/15 bg-[#0b101d]/90 px-3 py-1.5 text-xs text-slate-400 backdrop-blur sm:block">
           Click the connection card to edit · click empty space to deselect

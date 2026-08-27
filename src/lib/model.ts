@@ -1,3 +1,5 @@
+// Relationship origin types with display labels and colors for the graph.
+
 export const ORIGINS = {
   in_person: { label: "Met in person", color: "#f59e0b" },
   github: { label: "GitHub", color: "#a78bfa" },
@@ -9,12 +11,13 @@ export const ORIGINS = {
 } as const;
 
 export type Origin = keyof typeof ORIGINS;
-
 export const ORIGIN_KEYS = Object.keys(ORIGINS) as Origin[];
 
 export function isOrigin(v: unknown): v is Origin {
   return typeof v === "string" && ORIGIN_KEYS.includes(v as Origin);
 }
+
+// --- Domain types (API response shapes) ---
 
 export interface Person {
   id: string;
@@ -51,34 +54,21 @@ export interface GraphPayload {
   edges: Relationship[];
 }
 
-export const ROADMAP = [
-  { label: "People graph with relationship context", done: true },
-  { label: "GitHub integration — repos, contributions, languages", done: false },
-
-  { label: "People-recommendation engine", done: false },
-  { label: "Project-recommendation engine", done: false },
-  { label: "Adaptive feedback layer", done: false },
-] as const;
+// --- Utility functions ---
 
 const NODE_PALETTE = [
-  "#6366f1",
-  "#8b5cf6",
-  "#ec4899",
-  "#f59e0b",
-  "#10b981",
-  "#06b6d4",
-  "#f97316",
-  "#84cc16",
-  "#eab308",
-  "#14b8a6",
+  "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
+  "#06b6d4", "#f97316", "#84cc16", "#eab308", "#14b8a6",
 ];
 
+/** Deterministic color from a name string. */
 export function colorForName(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return NODE_PALETTE[h % NODE_PALETTE.length];
 }
 
+/** First two initials from a name. */
 export function initialsOf(name: string): string {
   return name
     .split(/\s+/)
@@ -88,6 +78,7 @@ export function initialsOf(name: string): string {
     .join("");
 }
 
+/** Convert hex color to rgba string. */
 export function hexToRgba(hex: string, alpha: number): string {
   const m = hex.replace("#", "");
   const r = parseInt(m.slice(0, 2), 16);
@@ -96,6 +87,7 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+/** Find overlapping strings between two arrays (case-insensitive). */
 export function overlap(a: string[], b: string[]): string[] {
   const lower = new Set(b.map((s) => s.toLowerCase()));
   return a.filter((s) => lower.has(s.toLowerCase()));

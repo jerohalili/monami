@@ -1,3 +1,5 @@
+// Singleton Prisma client. In dev, attaches to globalThis to survive HMR.
+
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };

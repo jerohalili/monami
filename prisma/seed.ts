@@ -1,3 +1,6 @@
+// Seed script: clears the database and inserts demo data.
+// Run: npm run db:seed
+
 import { PrismaClient } from "@prisma/client";
 import { insertDemoData } from "../src/lib/demo";
 
@@ -11,8 +14,5 @@ async function main() {
 }
 
 main()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
+  .catch((err) => { console.error(err); process.exit(1); })
   .finally(() => db.$disconnect());

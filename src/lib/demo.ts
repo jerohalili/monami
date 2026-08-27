@@ -1,5 +1,10 @@
+// Demo dataset: 11 people and 13 relationships for the seed endpoint.
+// Used by prisma/seed.ts and POST /api/seed.
+
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { Origin } from "./model";
+
+// --- Types ---
 
 export interface DemoPerson {
   key: string;
@@ -30,9 +35,13 @@ export interface DemoEdge {
   metAt?: string;
 }
 
+// --- Helpers ---
+
 function avatar(seed: string): string {
   return `https://api.dicebear.com/9.x/notionists/svg?seed=${seed}&backgroundColor=334155`;
 }
+
+// --- Data ---
 
 export const DEMO_PEOPLE: DemoPerson[] = [
   {
@@ -56,8 +65,7 @@ export const DEMO_PEOPLE: DemoPerson[] = [
     interests: ["queueing theory", "indie hacking", "climbing"],
     tags: ["backend", "friend"],
     links: { GitHub: "https://github.com/mayachen-dev" },
-    notes:
-      "Sharpest backend brain I know. Prefers async updates over meetings.",
+    notes: "Sharpest backend brain I know. Prefers async updates over meetings.",
   },
   {
     key: "jonas",
@@ -162,124 +170,27 @@ export const DEMO_PEOPLE: DemoPerson[] = [
 ];
 
 export const DEMO_EDGES: DemoEdge[] = [
-  {
-    from: "you",
-    to: "maya",
-    origin: "online",
-    context:
-      "Met in #backend-help on Indie Dev Lounge when she debugged my queue worker over a screenshare. Weekly coworking since.",
-    communities: ["Indie Dev Lounge"],
-    projects: ["monami"],
-    strength: 3,
-    metAt: "2025-03-14",
-  },
-  {
-    from: "you",
-    to: "jonas",
-    origin: "github",
-    context:
-      "Reviewed each other's PRs on WASM tooling; he maintains wqueue which monami's job runner borrows from.",
-    projects: ["wqueue", "monami"],
-    strength: 2,
-  },
-  {
-    from: "you",
-    to: "priya",
-    origin: "in_person",
-    context:
-      "Teammates at HackZurich — she built the recsys that got us to the finals. Kept in touch ever since.",
-    strength: 3,
-    metAt: "2025-11-08",
-  },
-  {
-    from: "priya",
-    to: "tom",
-    origin: "introduction",
-    context: "Priya introduced us after the hackathon showcase; he did our pitch deck visuals.",
-    strength: 1,
-  },
-  {
-    from: "you",
-    to: "lena",
-    origin: "school",
-    context:
-      "Uni flatmate for three years. Keeps my clusters honest and my board-game shelf full.",
-    communities: ["Berlin Tech Board Games"],
-    strength: 3,
-  },
-  {
-    from: "you",
-    to: "diego",
-    origin: "in_person",
-    context:
-      "48h game jam team 'Null Pointer' — shipped 'Mothership Mono' together. Still jam annually.",
-    projects: ["mothership-mono"],
-    strength: 2,
-    metAt: "2026-01-31",
-  },
-  {
-    from: "you",
-    to: "sara",
-    origin: "in_person",
-    context:
-      "Asked the sharpest question at my GraphQL conference talk; runs Nordwind's platform team now.",
-    strength: 1,
-    metAt: "2025-09-12",
-  },
-  {
-    from: "you",
-    to: "alex",
-    origin: "online",
-    context:
-      "Weekly AI Builders voice chats; sends the best arxiv digests. Shipped three side projects this year.",
-    communities: ["AI Builders"],
-    strength: 2,
-  },
-  {
-    from: "maya",
-    to: "nadia",
-    origin: "work",
-    context: "Contracted together at Fathom before Nadia went freelance.",
-    strength: 2,
-  },
-  {
-    from: "you",
-    to: "nadia",
-    origin: "introduction",
-    context:
-      "Maya recommended her for a contract; we co-built a design system for a fintech client.",
-    projects: ["atlas-design-system"],
-    strength: 2,
-  },
-  {
-    from: "you",
-    to: "felix",
-    origin: "github",
-    context:
-      "Files excellent issues on graphkit and actually reads the docs. Wants to co-maintain someday.",
-    projects: ["graphkit"],
-    strength: 1,
-  },
-  {
-    from: "maya",
-    to: "jonas",
-    origin: "github",
-    context: "Contributed queue benchmarks to wqueue.",
-    projects: ["wqueue"],
-    strength: 1,
-  },
-  {
-    from: "diego",
-    to: "tom",
-    origin: "in_person",
-    context: "Game jam art collaboration — Tom animated all of Diego's sprites.",
-    projects: ["mothership-mono"],
-    strength: 2,
-  },
+  { from: "you", to: "maya", origin: "online", context: "Met in #backend-help on Indie Dev Lounge when she debugged my queue worker over a screenshare. Weekly coworking since.", communities: ["Indie Dev Lounge"], projects: ["monami"], strength: 3, metAt: "2025-03-14" },
+  { from: "you", to: "jonas", origin: "github", context: "Reviewed each other's PRs on WASM tooling; he maintains wqueue which monami's job runner borrows from.", projects: ["wqueue", "monami"], strength: 2 },
+  { from: "you", to: "priya", origin: "in_person", context: "Teammates at HackZurich — she built the recsys that got us to the finals. Kept in touch ever since.", strength: 3, metAt: "2025-11-08" },
+  { from: "priya", to: "tom", origin: "introduction", context: "Priya introduced us after the hackathon showcase; he did our pitch deck visuals.", strength: 1 },
+  { from: "you", to: "lena", origin: "school", context: "Uni flatmate for three years. Keeps my clusters honest and my board-game shelf full.", communities: ["Berlin Tech Board Games"], strength: 3 },
+  { from: "you", to: "diego", origin: "in_person", context: "48h game jam team 'Null Pointer' — shipped 'Mothership Mono' together. Still jam annually.", projects: ["mothership-mono"], strength: 2, metAt: "2026-01-31" },
+  { from: "you", to: "sara", origin: "in_person", context: "Asked the sharpest question at my GraphQL conference talk; runs Nordwind's platform team now.", strength: 1, metAt: "2025-09-12" },
+  { from: "you", to: "alex", origin: "online", context: "Weekly AI Builders voice chats; sends the best arxiv digests. Shipped three side projects this year.", communities: ["AI Builders"], strength: 2 },
+  { from: "maya", to: "nadia", origin: "work", context: "Contracted together at Fathom before Nadia went freelance.", strength: 2 },
+  { from: "you", to: "nadia", origin: "introduction", context: "Maya recommended her for a contract; we co-built a design system for a fintech client.", projects: ["atlas-design-system"], strength: 2 },
+  { from: "you", to: "felix", origin: "github", context: "Files excellent issues on graphkit and actually reads the docs. Wants to co-maintain someday.", projects: ["graphkit"], strength: 1 },
+  { from: "maya", to: "jonas", origin: "github", context: "Contributed queue benchmarks to wqueue.", projects: ["wqueue"], strength: 1 },
+  { from: "diego", to: "tom", origin: "in_person", context: "Game jam art collaboration — Tom animated all of Diego's sprites.", projects: ["mothership-mono"], strength: 2 },
 ];
 
+// --- Seed function ---
+
+/** Insert all demo people and edges into the database. */
 export async function insertDemoData(db: PrismaClient) {
   const idByKey = new Map<string, string>();
+
   for (const p of DEMO_PEOPLE) {
     const created = await db.person.create({
       data: {
@@ -301,6 +212,7 @@ export async function insertDemoData(db: PrismaClient) {
     });
     idByKey.set(p.key, created.id);
   }
+
   for (const e of DEMO_EDGES) {
     const sourceId = idByKey.get(e.from);
     const targetId = idByKey.get(e.to);

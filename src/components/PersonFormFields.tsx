@@ -1,3 +1,7 @@
+// Person form: fields for name, headline, company, nickname, location, avatar,
+// email, github, skills, interests, tags, links, and notes.
+// Shared by AddPersonModal and DetailsPanel edit mode.
+
 "use client";
 
 import type { Person } from "@/lib/model";
@@ -19,21 +23,12 @@ export interface PersonFormState {
 }
 
 export const EMPTY_PERSON_FORM: PersonFormState = {
-  name: "",
-  nickname: "",
-  avatarUrl: "",
-  headline: "",
-  company: "",
-  location: "",
-  email: "",
-  githubLogin: "",
-  skills: "",
-  interests: "",
-  tags: "",
-  notes: "",
-  linksRaw: "",
+  name: "", nickname: "", avatarUrl: "", headline: "", company: "",
+  location: "", email: "", githubLogin: "", skills: "", interests: "",
+  tags: "", notes: "", linksRaw: "",
 };
 
+/** Convert a Person object into form state for editing. */
 export function personToForm(p: Person): PersonFormState {
   return {
     name: p.name,
@@ -48,12 +43,11 @@ export function personToForm(p: Person): PersonFormState {
     interests: p.interests.join(", "),
     tags: p.tags.join(", "),
     notes: p.notes ?? "",
-    linksRaw: Object.entries(p.links)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join("\n"),
+    linksRaw: Object.entries(p.links).map(([k, v]) => `${k}: ${v}`).join("\n"),
   };
 }
 
+/** Convert form state into a POST/PATCH body. */
 export function formToPersonPayload(f: PersonFormState) {
   const links: Record<string, string> = {};
   for (const line of f.linksRaw.split("\n")) {
@@ -79,144 +73,73 @@ export function formToPersonPayload(f: PersonFormState) {
   };
 }
 
-export function PersonFormFields({
-  value,
-  onChange,
-  isNew,
-}: {
+export function PersonFormFields({ value, onChange, isNew }: {
   value: PersonFormState;
   onChange: (next: PersonFormState) => void;
   isNew: boolean;
 }) {
-  const set = (k: keyof PersonFormState) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => onChange({ ...value, [k]: e.target.value });
+  const set = (k: keyof PersonFormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    onChange({ ...value, [k]: e.target.value });
 
   return (
     <div className="space-y-3">
       <div>
         <label className="label">Name *</label>
-        <input
-          className="field"
-          value={value.name}
-          onChange={set("name")}
-          placeholder="Ada Lovelace"
-          autoFocus={isNew}
-        />
+        <input className="field" value={value.name} onChange={set("name")} placeholder="Ada Lovelace" autoFocus={isNew} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Headline</label>
-          <input
-            className="field"
-            value={value.headline}
-            onChange={set("headline")}
-            placeholder="Backend engineer @ …"
-          />
+          <input className="field" value={value.headline} onChange={set("headline")} placeholder="Backend engineer @ ..." />
         </div>
         <div>
           <label className="label">Company</label>
-          <input
-            className="field"
-            value={value.company}
-            onChange={set("company")}
-            placeholder="Fathom"
-          />
+          <input className="field" value={value.company} onChange={set("company")} placeholder="Fathom" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Nickname / handle</label>
-          <input
-            className="field"
-            value={value.nickname}
-            onChange={set("nickname")}
-            placeholder="maya.dev"
-          />
+          <input className="field" value={value.nickname} onChange={set("nickname")} placeholder="maya.dev" />
         </div>
         <div>
           <label className="label">Location</label>
-          <input
-            className="field"
-            value={value.location}
-            onChange={set("location")}
-            placeholder="Berlin"
-          />
+          <input className="field" value={value.location} onChange={set("location")} placeholder="Berlin" />
         </div>
       </div>
       <div>
         <label className="label">Avatar URL</label>
-        <input
-          className="field"
-          value={value.avatarUrl}
-          onChange={set("avatarUrl")}
-          placeholder="https://…"
-        />
+        <input className="field" value={value.avatarUrl} onChange={set("avatarUrl")} placeholder="https://..." />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Email</label>
-          <input
-            className="field"
-            value={value.email}
-            onChange={set("email")}
-            placeholder="ada@example.com"
-          />
+          <input className="field" value={value.email} onChange={set("email")} placeholder="ada@example.com" />
         </div>
         <div>
           <label className="label">GitHub login</label>
-          <input
-            className="field"
-            value={value.githubLogin}
-            onChange={set("githubLogin")}
-            placeholder="adalovelace"
-          />
+          <input className="field" value={value.githubLogin} onChange={set("githubLogin")} placeholder="adalovelace" />
         </div>
       </div>
       <div>
         <label className="label">Skills</label>
-        <input
-          className="field"
-          value={value.skills}
-          onChange={set("skills")}
-          placeholder="Go, Postgres, Kafka"
-        />
+        <input className="field" value={value.skills} onChange={set("skills")} placeholder="Go, Postgres, Kafka" />
       </div>
       <div>
         <label className="label">Interests</label>
-        <input
-          className="field"
-          value={value.interests}
-          onChange={set("interests")}
-          placeholder="distributed systems, climbing"
-        />
+        <input className="field" value={value.interests} onChange={set("interests")} placeholder="distributed systems, climbing" />
       </div>
       <div>
         <label className="label">Tags</label>
-        <input
-          className="field"
-          value={value.tags}
-          onChange={set("tags")}
-          placeholder="backend, friend"
-        />
+        <input className="field" value={value.tags} onChange={set("tags")} placeholder="backend, friend" />
       </div>
       <div>
         <label className="label">Links</label>
-        <textarea
-          className="field min-h-[64px] font-mono text-xs"
-          value={value.linksRaw}
-          onChange={set("linksRaw")}
-          placeholder={"GitHub: https://github.com/…\nPortfolio: https://…"}
-        />
+        <textarea className="field min-h-[64px] font-mono text-xs" value={value.linksRaw} onChange={set("linksRaw")} placeholder={"GitHub: https://github.com/...\nPortfolio: https://..."} />
       </div>
       <div>
-        <label className="label">Notes — the why behind this connection</label>
-        <textarea
-          className="field min-h-[80px]"
-          value={value.notes}
-          onChange={set("notes")}
-          placeholder="How you met, what you talked about, follow-ups…"
-        />
+        <label className="label">Notes</label>
+        <textarea className="field min-h-[80px]" value={value.notes} onChange={set("notes")} placeholder="How you met, what you talked about, follow-ups..." />
       </div>
     </div>
   );

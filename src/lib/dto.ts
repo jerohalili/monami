@@ -1,14 +1,17 @@
+// Prisma row -> API DTO transformers.
+// Keeps API consumers decoupled from Prisma column shapes.
+
 import type { Prisma } from "@prisma/client";
 import { isOrigin, type Origin, type Person, type Relationship } from "./model";
 
 type PersonRow = Prisma.PersonGetPayload<object>;
 type EdgeRow = Prisma.EdgeGetPayload<object>;
 
+// --- Internal helpers ---
+
 function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((v) => (typeof v === "string" ? v.trim() : ""))
-    .filter(Boolean);
+  return value.map((v) => (typeof v === "string" ? v.trim() : "")).filter(Boolean);
 }
 
 function toRecord(value: unknown): Record<string, string> {
@@ -20,20 +23,23 @@ function toRecord(value: unknown): Record<string, string> {
   return out;
 }
 
+// --- Public input helpers (used by API route handlers) ---
+
+/** Parse a comma-separated string or array into a clean string[] */
 export function toStringArrayInput(value: unknown): string[] {
   if (Array.isArray(value)) return toStringArray(value);
   if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    return value.split(",").map((s) => s.trim()).filter(Boolean);
   }
   return [];
 }
 
+/** Parse a links object from the request body. */
 export function toLinksInput(value: unknown): Record<string, string> {
   return toRecord(value);
 }
+
+// --- DTO mappers ---
 
 export function personDTO(p: PersonRow): Person {
   return {

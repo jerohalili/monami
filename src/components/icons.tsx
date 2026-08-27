@@ -1,3 +1,5 @@
+// SVG icon components used throughout the UI.
+
 import type { SVGProps } from "react";
 
 type P = SVGProps<SVGSVGElement>;
@@ -28,11 +30,7 @@ export function IconLogo(props: P) {
 }
 
 export function IconPlus(props: P) {
-  return (
-    <svg {...base(props)}>
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
+  return <svg {...base(props)}><path d="M12 5v14M5 12h14" /></svg>;
 }
 
 export function IconLink(props: P) {
@@ -54,11 +52,7 @@ export function IconSearch(props: P) {
 }
 
 export function IconX(props: P) {
-  return (
-    <svg {...base(props)}>
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  );
+  return <svg {...base(props)}><path d="M18 6 6 18M6 6l12 12" /></svg>;
 }
 
 export function IconPencil(props: P) {

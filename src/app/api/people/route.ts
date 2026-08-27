@@ -1,10 +1,9 @@
+// GET /api/people — list all people.
+// POST /api/people — create a new person.
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  personDTO,
-  toLinksInput,
-  toStringArrayInput,
-} from "@/lib/dto";
+import { personDTO, toLinksInput, toStringArrayInput } from "@/lib/dto";
 
 function optionalString(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -22,11 +21,11 @@ export async function POST(req: NextRequest) {
   if (!b || typeof b !== "object") {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  const name = optionalString((b as Record<string, unknown>).name);
+  const r = b as Record<string, unknown>;
+  const name = optionalString(r.name);
   if (!name) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
-  const r = b as Record<string, unknown>;
   try {
     const person = await db.person.create({
       data: {
@@ -47,9 +46,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(personDTO(person), { status: 201 });
   } catch {
-    return NextResponse.json(
-      { error: "Could not create person" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Could not create person" }, { status: 500 });
   }
 }
