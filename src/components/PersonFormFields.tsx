@@ -135,11 +135,11 @@ export function PersonFormFields({ value, onChange, isNew }: {
       </div>
       <div>
         <label className="label">Links</label>
-        <textarea className="field min-h-[64px] font-mono text-xs" value={value.linksRaw} onChange={set("linksRaw")} placeholder={"GitHub: https://github.com/...\nPortfolio: https://..."} />
+        <textarea className="field min-h-16 font-mono text-xs" value={value.linksRaw} onChange={set("linksRaw")} placeholder={"GitHub: https://github.com/...\nPortfolio: https://..."} />
       </div>
       <div>
         <label className="label">Notes</label>
-        <textarea className="field min-h-[80px]" value={value.notes} onChange={set("notes")} placeholder="How you met, what you talked about, follow-ups..." />
+        <textarea className="field min-h-20" value={value.notes} onChange={set("notes")} placeholder="How you met, what you talked about, follow-ups..." />
       </div>
     </div>
   );

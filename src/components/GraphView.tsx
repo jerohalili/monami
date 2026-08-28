@@ -73,8 +73,12 @@ export default function GraphView({
   const [, bumpTick] = useState(0);
   const avatarCache = useRef(new Map<string, HTMLImageElement>());
   const nodeMapRef = useRef(new Map<string, GNode>());
+  const linkMapRef = useRef(new Map<string, Relationship & { source: string; target: string }>());
   const pendingPinRef = useRef<{ id: string; x: number; y: number } | null>(null);
   const nodeSigRef = useRef<string>("");
+  const linkSigRef = useRef<string>("");
+  const addedNodeRef = useRef(false);
+  const pinnedByAddRef = useRef<Set<string>>(new Set());
 
   // Track container size.
   useEffect(() => {
@@ -125,16 +129,33 @@ export default function GraphView({
       } else {
         existing = { ...p, degree: degree[p.id] ?? 0 } as GNode;
         map.set(p.id, existing);
+        addedNodeRef.current = true;
       }
       nodes.push(existing);
     }
+    // Garbage-collect removed nodes and links from maps
     for (const id of map.keys()) {
       if (!data.people.find((p) => p.id === id)) map.delete(id);
     }
-    return {
-      nodes,
-      links: data.edges.map((e) => ({ ...e, source: e.sourceId, target: e.targetId })),
-    };
+    for (const key of linkMapRef.current.keys()) {
+      if (!data.edges.find((e) => `${e.sourceId}->${e.targetId}` === key)) {
+        linkMapRef.current.delete(key);
+      }
+    }
+    // Build links: reuse existing objects to preserve identity across renders
+    const links: (Relationship & { source: string; target: string })[] = [];
+    for (const e of data.edges) {
+      const key = `${e.sourceId}->${e.targetId}`;
+      let existing = linkMapRef.current.get(key);
+      if (existing) {
+        Object.assign(existing, { ...e, source: e.sourceId, target: e.targetId });
+      } else {
+        existing = { ...e, source: e.sourceId, target: e.targetId };
+        linkMapRef.current.set(key, existing);
+      }
+      links.push(existing);
+    }
+    return { nodes, links };
   }, [data, pendingPlacement]);
 
   // Fit when new nodes are added.
@@ -204,7 +225,7 @@ export default function GraphView({
     // was fighting the anchor-to-"You"-node forces above, which is what pushed
     // unconnected nodes off toward a competing center instead of settling near the cluster.
     g.d3Force("center", null);
-    // Only reheat when the actual set of nodes in the simulation changed —
+    // Only reheat when the actual topology changed (nodes or links added/removed) —
     // not on every referential change of `graphData`. That memo also changes
     // reference when unrelated state updates (e.g. pendingPlacement toggling,
     // or a data refresh where a pending node is still excluded) cause it to
@@ -213,8 +234,39 @@ export default function GraphView({
     // behind it — including, ironically, jolts while a new node was still
     // pending placement and hadn't entered the simulation at all.
     const nodeSig = graphData.nodes.map((n) => n.id).sort().join(",");
-    if (nodeSig !== nodeSigRef.current) {
+    const linkSig = graphData.links
+      .map((l) => `${lid(l.source)}->${lid(l.target)}`)
+      .sort()
+      .join(",");
+    if (nodeSig !== nodeSigRef.current || linkSig !== linkSigRef.current) {
       nodeSigRef.current = nodeSig;
+      linkSigRef.current = linkSig;
+
+      // When a new node was just added, pin existing nodes temporarily so the
+      // new node settles into place without dragging the whole layout.  They
+      // are unpinned after 1.5 s — long enough for the simulation to converge.
+      if (addedNodeRef.current) {
+        addedNodeRef.current = false;
+        const pinned = new Set<string>();
+        for (const n of graphData.nodes) {
+          if (n.fx === undefined && n.fy === undefined) {
+            pinned.add(n.id);
+            n.fx = n.x;
+            n.fy = n.y;
+          }
+        }
+        pinnedByAddRef.current = pinned;
+        setTimeout(() => {
+          for (const n of graphData.nodes) {
+            if (pinned.has(n.id)) {
+              n.fx = undefined;
+              n.fy = undefined;
+            }
+          }
+          pinnedByAddRef.current = new Set();
+        }, 1500);
+      }
+
       g.d3ReheatSimulation();
     }
   }, [graphData, engineReady]);
@@ -526,7 +578,7 @@ export default function GraphView({
       {/* Hover tooltip for links */}
       {hoverLink && (
         <div
-          className="pointer-events-none absolute z-20 max-w-[280px] rounded-xl px-3 py-2 text-xs shadow-xl backdrop-blur"
+          className="pointer-events-none absolute z-20 max-w-70 rounded-xl px-3 py-2 text-xs shadow-xl backdrop-blur"
           style={{
             left: Math.min(tipPos.x + 16, size.w - 300 > 0 ? tipPos.x + 16 : Math.max(8, size.w - 296)),
             top: tipPos.y + 16,

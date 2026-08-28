@@ -309,7 +309,7 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
   return (
     <>
       <button className="rounded-lg p-1 text-xs text-slate-500 hover:text-slate-200" onClick={onClose}>Close</button>
-      <div className="mt-1 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <div className="mt-1 rounded-xl border border-white/10 bg-white/3 p-3">
         <div className="flex items-center justify-between gap-2 text-sm font-semibold text-white">
           <button className="truncate hover:underline" onClick={() => onSelectPerson(edge.sourceId)}>{source?.name ?? "?"}</button>
           <span className="shrink-0 px-1 text-xs font-normal" style={{ color: ORIGINS[edge.origin].color }}>↔</span>

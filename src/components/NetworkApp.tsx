@@ -155,7 +155,7 @@ export default function NetworkApp() {
         </div>
 
         {/* Search */}
-        <div className="pointer-events-auto relative min-w-[180px] flex-1 sm:max-w-md">
+        <div className="pointer-events-auto relative min-w-45 flex-1 sm:max-w-md">
           <IconSearch width={15} height={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-dim)" }} />
           <input
             className="field rounded-xl backdrop-blur pl-9"
@@ -231,7 +231,7 @@ export default function NetworkApp() {
 
       {/* Details sidebar */}
       {(selectedPerson || selectedEdge) && (
-        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md sm:bottom-4 sm:top-4 sm:left-auto sm:right-4 sm:max-h-none sm:w-[400px] sm:overflow-y-auto sm:rounded-2xl lg:w-[430px]" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md sm:bottom-4 sm:top-4 sm:left-auto sm:right-4 sm:max-h-none sm:w-100 sm:overflow-y-auto sm:rounded-2xl lg:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
           <div className="space-y-4 p-4">
             <DetailsPanel
               person={selectedPerson}

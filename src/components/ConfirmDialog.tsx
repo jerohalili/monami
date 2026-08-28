@@ -32,7 +32,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={confirm}>
       {children}
       {msg && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6">
+        <div className="fixed inset-0 z-100 flex items-end justify-center sm:items-center sm:p-6">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => close(false)} />
           <div className="relative w-full max-w-sm rounded-t-2xl p-5 shadow-2xl sm:rounded-2xl" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
             <p className="text-sm leading-relaxed" style={{ color: "var(--text)" }}>{msg}</p>

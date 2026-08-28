@@ -135,7 +135,7 @@ export default function AddConnectionModal({
         </div>
 
         {/* Person list */}
-        <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-xl p-1" style={{ border: "1px solid var(--border)", background: "var(--bg-hover)" }}>
+        <div className="max-h-70 space-y-1 overflow-y-auto rounded-xl p-1" style={{ border: "1px solid var(--border)", background: "var(--bg-hover)" }}>
           {filtered.length === 0 && (
             <p className="px-3 py-4 text-center text-sm" style={{ color: "var(--text-dim)" }}>No people found</p>
           )}

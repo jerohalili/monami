@@ -84,7 +84,7 @@ export function EdgeFormFields({ value, onChange }: {
       </div>
       <div>
         <label className="label">Context</label>
-        <textarea className="field min-h-[80px]" value={value.context} onChange={set("context")} placeholder="Met her at a meetup, she does backend..." />
+        <textarea className="field min-h-20" value={value.context} onChange={set("context")} placeholder="Met her at a meetup, she does backend..." />
       </div>
       <div>
         <label className="label">Shared communities / servers</label>
