@@ -12,6 +12,7 @@ import {
   colorForName,
   hexToRgba,
   initialsOf,
+  nodeColor,
   type GraphPayload,
   type Person,
   type Relationship,
@@ -25,8 +26,6 @@ export interface GraphApi {
   zoomIn: (ms?: number) => void;
   zoomOut: (ms?: number) => void;
   fit: (ms?: number) => void;
-  saveCamera: () => void;
-  restoreCamera: () => void;
 }
 
 interface GNode extends Person {
@@ -88,7 +87,6 @@ export default function GraphView({
   const unpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinnedByAddTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevNodeCountRef = useRef<number | null>(null);
-  const pendingCameraRestore = useRef<{ cx: number; cy: number; k: number } | null>(null);
 
   // Track container size.
   useEffect(() => {
@@ -112,31 +110,6 @@ export default function GraphView({
         if (g) g.zoom(g.zoom() / 1.3, t ?? 200);
       },
       fit: (t) => fgRef.current?.zoomToFit(t ?? 400, 90),
-      saveCamera: () => {
-        const g = fgRef.current;
-        if (!g) return;
-        pendingCameraRestore.current = {
-          cx: g.centerAt().x,
-          cy: g.centerAt().y,
-          k: g.zoom(),
-        };
-      },
-      restoreCamera: () => {
-        const restore = pendingCameraRestore.current;
-        if (!restore || !fgRef.current) return;
-        pendingCameraRestore.current = null;
-        // Double-rAF: first frame lets the library finish processing the data
-        // change (including its auto-zoom), second frame ensures the canvas
-        // has re-rendered with the restored transform.
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const g = fgRef.current;
-            if (!g) return;
-            g.centerAt(restore.cx, restore.cy, 0);
-            g.zoom(restore.k, 0);
-          });
-        });
-      },
     };
     return () => { apiRef.current = null; };
   }, [apiRef]);
@@ -208,7 +181,7 @@ export default function GraphView({
     return result;
   }, [data, pendingPlacement]);
 
-  // Fit when new nodes are added.
+  // Fit when new nodes are added or removed.
   const prevCount = useRef(graphData.nodes.length);
   const didInitialFit = useRef(false);
   const didMarkEngineReady = useRef(false);
@@ -222,6 +195,15 @@ export default function GraphView({
         if (pendingPinRef.current) return;
         try { fgRef.current?.zoomToFit(400, 100); } catch { /* noop */ }
       }, 250);
+      prevCount.current = graphData.nodes.length;
+      return () => clearTimeout(t);
+    } else if (prevCount.current !== null && graphData.nodes.length < prevCount.current) {
+      // Node deleted — smooth animated reframe over 400ms.
+      // 50ms delay lets the library's onFinishUpdate auto-zoom fire and the
+      // simulation tick once, so zoomToFit computes the correct bounding box.
+      const t = setTimeout(() => {
+        try { fgRef.current?.zoomToFit(400, 100); } catch { /* noop */ }
+      }, 50);
       prevCount.current = graphData.nodes.length;
       return () => clearTimeout(t);
     }
@@ -243,23 +225,6 @@ export default function GraphView({
       pendingPinRef.current = null;
       unpinTimerRef.current = null;
     }, 200);
-  }, [graphData]);
-
-  // Restore camera after data change if a save/restore was requested.
-  // This overrides the library's internal auto-zoom (onFinishUpdate in
-  // force-graph.js) which recalculates zoom based on node count.
-  useEffect(() => {
-    const restore = pendingCameraRestore.current;
-    if (!restore || !fgRef.current) return;
-    pendingCameraRestore.current = null;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const g = fgRef.current;
-        if (!g) return;
-        g.centerAt(restore.cx, restore.cy, 0);
-        g.zoom(restore.k, 0);
-      });
-    });
   }, [graphData]);
 
   // Configure charge force: weaker repulsion for unconnected nodes.
@@ -475,7 +440,7 @@ export default function GraphView({
     if (!drewAvatar) {
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = isY ? "#fbbf24" : colorForName(n.name);
+      ctx.fillStyle = nodeColor(n.name);
       ctx.fill();
       const fs = r * (initialsOf(n.name).length > 1 ? 0.9 : 1.2);
       ctx.font = `600 ${fs}px system-ui, sans-serif`;
@@ -746,7 +711,7 @@ export default function GraphView({
               top: tipPos.y - 14,
               width: 28,
               height: 28,
-              background: colorForName(pendingPlacement.name),
+              background: nodeColor(pendingPlacement.name),
               border: "2px solid #8b5cf6",
               boxShadow: "0 0 12px rgba(139,92,246,0.5)",
             }}

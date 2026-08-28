@@ -67,6 +67,16 @@ export function colorForName(name: string): string {
   return NODE_PALETTE[h % NODE_PALETTE.length];
 }
 
+/** Node fill color: amber for "You", palette hash for everyone else. */
+export function nodeColor(name: string): string {
+  return name === "You" ? "#fbbf24" : colorForName(name);
+}
+
+/** Auto-generated avatar URL using Dicebear notionists style. */
+export function autoAvatarUrl(name: string): string {
+  return `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=334155`;
+}
+
 /** First two initials from a name. */
 export function initialsOf(name: string): string {
   return name

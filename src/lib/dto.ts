@@ -2,7 +2,7 @@
 // Keeps API consumers decoupled from Prisma column shapes.
 
 import type { Prisma } from "@prisma/client";
-import { isOrigin, type Origin, type Person, type Relationship } from "./model";
+import { autoAvatarUrl, isOrigin, type Origin, type Person, type Relationship } from "./model";
 
 type PersonRow = Prisma.PersonGetPayload<object>;
 type EdgeRow = Prisma.EdgeGetPayload<object>;
@@ -46,7 +46,7 @@ export function personDTO(p: PersonRow): Person {
     id: p.id,
     name: p.name,
     nickname: p.nickname,
-    avatarUrl: p.avatarUrl,
+    avatarUrl: p.avatarUrl ?? autoAvatarUrl(p.name),
     headline: p.headline,
     company: p.company,
     location: p.location,
