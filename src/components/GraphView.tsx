@@ -79,6 +79,9 @@ export default function GraphView({
   const linkSigRef = useRef<string>("");
   const addedNodeRef = useRef(false);
   const pinnedByAddRef = useRef<Set<string>>(new Set());
+  const isDraggingRef = useRef(false);
+  const dragNodeIdRef = useRef<string | null>(null);
+  const pendingReheatRef = useRef(false);
 
   // Track container size.
   useEffect(() => {
@@ -119,7 +122,12 @@ export default function GraphView({
       if (pendingPlacement && p.id === pendingPlacement.id && !map.has(p.id)) continue;
       let existing = map.get(p.id);
       if (existing) {
-        Object.assign(existing, { ...p, degree: degree[p.id] ?? 0 });
+        // Skip metadata update for the actively dragged node — the library is
+        // continuously setting fx/fy and Object.assign would overwrite them,
+        // causing the node to snap back.
+        if (!(isDraggingRef.current && existing.id === dragNodeIdRef.current)) {
+          Object.assign(existing, { ...p, degree: degree[p.id] ?? 0 });
+        }
         // Re-apply pin if this node was just placed (Object.assign overwrites fx/fy)
         const pin = pendingPinRef.current;
         if (pin && pin.id === p.id) {
@@ -267,7 +275,13 @@ export default function GraphView({
         }, 1500);
       }
 
-      g.d3ReheatSimulation();
+      // Defer reheat if a node is being dragged — reheating mid-drag causes
+      // d3-force to fight the locked fx/fy, resulting in viewport drift.
+      if (!isDraggingRef.current) {
+        g.d3ReheatSimulation();
+      } else {
+        pendingReheatRef.current = true;
+      }
     }
   }, [graphData, engineReady]);
 
@@ -534,6 +548,19 @@ export default function GraphView({
           linkCanvasObjectMode={() => "replace"}
           onNodeClick={(n: object) => onSelectPerson((n as GNode).id)}
           onNodeHover={(n: object | null) => setHoverNode(n ? (n as GNode).id : null)}
+          onNodeDrag={(n: object) => {
+            isDraggingRef.current = true;
+            dragNodeIdRef.current = (n as GNode).id;
+          }}
+          onNodeDragEnd={() => {
+            isDraggingRef.current = false;
+            dragNodeIdRef.current = null;
+            if (pendingReheatRef.current) {
+              pendingReheatRef.current = false;
+              fgRef.current?.d3ReheatSimulation();
+            }
+          }}
+          enablePanInteraction={(e: MouseEvent) => !isDraggingRef.current}
           onLinkClick={(l: object) => onSelectEdge((l as Relationship).id)}
           onLinkHover={(l: object | null) => setHoverLink(l ? (l as Relationship) : null)}
           onEngineTick={() => {
