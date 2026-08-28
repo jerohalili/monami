@@ -242,6 +242,8 @@ export default function NetworkApp() {
               onChanged={async () => { await load(); }}
               onClearedSelection={() => selectPerson(null)}
               onEditEdgeSelected={selectPerson}
+              onSaveCamera={() => apiRef.current?.saveCamera()}
+              onRestoreCamera={() => apiRef.current?.restoreCamera()}
             />
           </div>
         </aside>

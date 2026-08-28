@@ -271,13 +271,15 @@ function EdgeView({ edge, data, onClose, onSelectPerson, onEditClick, onDelete }
 
 // --- Edge editor ---
 
-function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelectPerson }: {
+function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelectPerson, onSaveCamera, onRestoreCamera }: {
   edge: Relationship;
   data: GraphPayload;
   onClose: () => void;
   onChanged: () => Promise<void>;
   onDeleted: () => Promise<void>;
   onSelectPerson: (id: string) => void;
+  onSaveCamera?: () => void;
+  onRestoreCamera?: () => void;
 }) {
   const [form, setForm] = useState<EdgeFormState>(edgeToForm(edge));
   const [saving, setSaving] = useState(false);
@@ -299,8 +301,10 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
   const remove = async () => {
     if (!(await confirm(`Remove the connection between ${source?.name} and ${target?.name}?`))) return;
     setSaving(true);
+    onSaveCamera?.();
     await fetch(`/api/edges/${edge.id}`, { method: "DELETE" });
     await onDeleted();
+    onRestoreCamera?.();
     setSaving(false);
   };
 
@@ -332,7 +336,7 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
 
 // --- Main panel ---
 
-export default function DetailsPanel({ person, edge, data, onClose, onSelectPerson, onChanged, onClearedSelection, onEditEdgeSelected }: {
+export default function DetailsPanel({ person, edge, data, onClose, onSelectPerson, onChanged, onClearedSelection, onEditEdgeSelected, onSaveCamera, onRestoreCamera }: {
   person: Person | null;
   edge: Relationship | null;
   data: GraphPayload;
@@ -341,6 +345,8 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
   onChanged: () => Promise<void>;
   onClearedSelection: () => void;
   onEditEdgeSelected: (id: string) => void;
+  onSaveCamera?: () => void;
+  onRestoreCamera?: () => void;
 }) {
   const [personEditing, setPersonEditing] = useState(false);
   const [edgeEditing, setEdgeEditing] = useState(false);
@@ -355,7 +361,7 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
     if (edgeEditing) {
       return (
         <div className="space-y-3">
-          <RelationshipEditor key={edge.id} edge={edge} data={data} onClose={onClose} onChanged={async () => { await onChanged(); setEdgeEditing(false); }} onDeleted={onChanged} onSelectPerson={onSelectPerson} />
+          <RelationshipEditor key={edge.id} edge={edge} data={data} onClose={onClose} onChanged={async () => { await onChanged(); setEdgeEditing(false); }} onDeleted={onChanged} onSelectPerson={onSelectPerson} onSaveCamera={onSaveCamera} onRestoreCamera={onRestoreCamera} />
         </div>
       );
     }
@@ -372,8 +378,10 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
             const source = data.people.find((p) => p.id === edge.sourceId);
             const target = data.people.find((p) => p.id === edge.targetId);
             if (!(await confirm(`Remove the connection between ${source?.name} and ${target?.name}?`))) return;
+            onSaveCamera?.();
             await fetch(`/api/edges/${edge.id}`, { method: "DELETE" });
             await onChanged();
+            onRestoreCamera?.();
           }}
         />
       </div>
@@ -417,9 +425,11 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
         onEditClick={() => { setForm(personToForm(person)); setPersonEditing(true); }}
         onDelete={async () => {
           if (!(await confirm(`Remove ${person.name} and all their connections?`))) return;
+          onSaveCamera?.();
           await fetch(`/api/people/${person.id}`, { method: "DELETE" });
           onClearedSelection();
           await onChanged();
+          onRestoreCamera?.();
         }}
       />
     </div>

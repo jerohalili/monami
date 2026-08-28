@@ -25,6 +25,8 @@ export interface GraphApi {
   zoomIn: (ms?: number) => void;
   zoomOut: (ms?: number) => void;
   fit: (ms?: number) => void;
+  saveCamera: () => void;
+  restoreCamera: () => void;
 }
 
 interface GNode extends Person {
@@ -86,6 +88,7 @@ export default function GraphView({
   const unpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinnedByAddTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevNodeCountRef = useRef<number | null>(null);
+  const pendingCameraRestore = useRef<{ cx: number; cy: number; k: number } | null>(null);
 
   // Track container size.
   useEffect(() => {
@@ -97,7 +100,7 @@ export default function GraphView({
     return () => ro.disconnect();
   }, []);
 
-  // Expose zoom/fit methods via apiRef.
+  // Expose zoom/fit/camera methods via apiRef.
   useEffect(() => {
     apiRef.current = {
       zoomIn: (t) => {
@@ -109,6 +112,31 @@ export default function GraphView({
         if (g) g.zoom(g.zoom() / 1.3, t ?? 200);
       },
       fit: (t) => fgRef.current?.zoomToFit(t ?? 400, 90),
+      saveCamera: () => {
+        const g = fgRef.current;
+        if (!g) return;
+        pendingCameraRestore.current = {
+          cx: g.centerAt().x,
+          cy: g.centerAt().y,
+          k: g.zoom(),
+        };
+      },
+      restoreCamera: () => {
+        const restore = pendingCameraRestore.current;
+        if (!restore || !fgRef.current) return;
+        pendingCameraRestore.current = null;
+        // Double-rAF: first frame lets the library finish processing the data
+        // change (including its auto-zoom), second frame ensures the canvas
+        // has re-rendered with the restored transform.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const g = fgRef.current;
+            if (!g) return;
+            g.centerAt(restore.cx, restore.cy, 0);
+            g.zoom(restore.k, 0);
+          });
+        });
+      },
     };
     return () => { apiRef.current = null; };
   }, [apiRef]);
@@ -215,6 +243,23 @@ export default function GraphView({
       pendingPinRef.current = null;
       unpinTimerRef.current = null;
     }, 200);
+  }, [graphData]);
+
+  // Restore camera after data change if a save/restore was requested.
+  // This overrides the library's internal auto-zoom (onFinishUpdate in
+  // force-graph.js) which recalculates zoom based on node count.
+  useEffect(() => {
+    const restore = pendingCameraRestore.current;
+    if (!restore || !fgRef.current) return;
+    pendingCameraRestore.current = null;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const g = fgRef.current;
+        if (!g) return;
+        g.centerAt(restore.cx, restore.cy, 0);
+        g.zoom(restore.k, 0);
+      });
+    });
   }, [graphData]);
 
   // Configure charge force: weaker repulsion for unconnected nodes.
