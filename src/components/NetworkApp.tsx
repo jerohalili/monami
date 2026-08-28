@@ -3,6 +3,7 @@
 
 "use client";
 
+import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GraphPayload, Person, Relationship } from "@/lib/model";
 import { ORIGINS } from "@/lib/model";
@@ -92,14 +93,6 @@ export default function NetworkApp() {
     () => data && selectedEdgeId ? data.edges.find((e) => e.id === selectedEdgeId) ?? null : null,
     [data, selectedEdgeId],
   );
-
-  // --- Seed demo data ---
-
-  const seedDemo = async () => {
-    setLoading(true);
-    await fetch("/api/seed", { method: "POST" });
-    await load();
-  };
 
   // --- Loading / error states ---
 
@@ -202,6 +195,11 @@ export default function NetworkApp() {
             <IconPlus />
             <span className="hidden sm:inline">Add person</span>
           </button>
+          <div className="w-px" style={{ background: "var(--border)" }} />
+          <button className="btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Sign out">
+            <span className="hidden sm:inline">Sign out</span>
+            <span className="sm:hidden">...</span>
+          </button>
         </div>
       </header>
 
@@ -256,14 +254,11 @@ export default function NetworkApp() {
             <IconLogo width={40} height={40} className="mx-auto text-violet-400" />
             <h1 className="text-lg font-semibold" style={{ color: "var(--text)" }}>Your sky is empty</h1>
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
-              Add the first person to your constellation, or load a sample network to explore what MonAmi can do.
+              Add the first person to your constellation to get started.
             </p>
-            <div className="flex flex-col gap-2">
-              <button className="btn-primary w-full" onClick={() => setShowAddPerson(true)}>
-                <IconPlus /> Add first person
-              </button>
-              <button className="btn w-full" onClick={seedDemo}>Load sample network</button>
-            </div>
+            <button className="btn-primary w-full" onClick={() => setShowAddPerson(true)}>
+              <IconPlus /> Add first person
+            </button>
           </div>
         </div>
       )}

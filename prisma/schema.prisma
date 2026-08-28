@@ -1,5 +1,6 @@
 // MonAmi data models.
-// Person = a node in the network graph.
+// User   = an authenticated account.
+// Person = a node in the network graph (owned by a user).
 // Edge   = a connection between two people (unique per pair).
 
 generator client {
@@ -11,8 +12,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  people       Person[]
+}
+
 model Person {
   id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
   nickname    String?
   avatarUrl   String?
@@ -26,7 +39,6 @@ model Person {
   notes       String?
   links       Json     // Record<string, string>
   githubLogin String?
-  isSelf      Boolean  @default(false)
   outgoing    Edge[]   @relation("source")
   incoming    Edge[]   @relation("target")
   createdAt   DateTime @default(now())

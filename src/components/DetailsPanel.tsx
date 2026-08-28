@@ -21,14 +21,14 @@ import {
 
 // --- Shared sub-components ---
 
-function Avatar({ p, size = 56 }: { p: Pick<Person, "name" | "avatarUrl" | "isSelf">; size?: number }) {
+function Avatar({ p, size = 56 }: { p: Pick<Person, "name" | "avatarUrl">; size?: number }) {
   return p.avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={p.avatarUrl} alt={p.name} width={size} height={size} className="rounded-full object-cover" style={{ width: size, height: size, border: "1px solid var(--border-strong)" }} />
   ) : (
     <div
       className="flex items-center justify-center rounded-full font-semibold"
-      style={{ width: size, height: size, background: p.isSelf ? "#fbbf24" : colorForName(p.name), fontSize: size * 0.36, color: "#0b101d" }}
+      style={{ width: size, height: size, background: colorForName(p.name), fontSize: size * 0.36, color: "#0b101d" }}
     >
       {initialsOf(p.name)}
     </div>
@@ -54,7 +54,7 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
   onEditClick: () => void;
   onDelete: () => void;
 }) {
-  const self = useMemo(() => data.people.find((p) => p.isSelf) ?? null, [data.people]);
+  const isYou = person.name === "You" && !person.headline && !person.company && !person.location;
   const connections = useMemo(() =>
     data.edges
       .filter((e) => e.sourceId === person.id || e.targetId === person.id)
@@ -63,8 +63,6 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
       .filter((c): c is { edge: Relationship; other: Person } => Boolean(c.other)),
     [data, person.id],
   );
-  const sharedInterests = self && !person.isSelf ? overlap(person.interests, self.interests) : [];
-  const sharedSkills = self && !person.isSelf ? overlap(person.skills, self.skills) : [];
 
   return (
     <>
@@ -73,7 +71,7 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-lg font-semibold" style={{ color: "var(--text)" }}>
             {person.name}
-            {person.isSelf && (
+            {isYou && (
               <span className="ml-2 rounded-full bg-amber-400/15 px-2 py-0.5 align-middle text-[10px] font-medium uppercase tracking-wider text-amber-300">You</span>
             )}
           </h2>
@@ -91,7 +89,7 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
 
       <div className="mt-3 flex gap-2">
         <button className="btn flex-1" onClick={onEditClick}><IconPencil /> Edit</button>
-        {!person.isSelf && (
+        {!isYou && (
           <button className="btn text-red-300 hover:bg-red-500/10" onClick={onDelete} title="Delete person"><IconTrash /></button>
         )}
       </div>
@@ -119,20 +117,11 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
         </Section>
       )}
 
-      {/* Shared interests */}
-      {sharedInterests.length > 0 && (
-        <Section title={`Shared interests with ${self?.name ?? "you"}`}>
-          {sharedInterests.map((i) => (
-            <span key={i} className="chip border-emerald-400/30 text-emerald-300">{i}</span>
-          ))}
-        </Section>
-      )}
-
       {/* Skills */}
       {person.skills.length > 0 && (
-        <Section title={`Skills${sharedSkills.length ? ` · shared: ${sharedSkills.join(", ")}` : ""}`}>
+        <Section title="Skills">
           {person.skills.map((s) => (
-            <span key={s} className={sharedSkills.includes(s) ? "chip border-emerald-400/30 text-emerald-300" : "chip"}>{s}</span>
+            <span key={s} className="chip">{s}</span>
           ))}
         </Section>
       )}
@@ -200,12 +189,12 @@ function EdgeView({ edge, data, onClose, onSelectPerson, onEditClick, onDelete }
       {/* People */}
       <div className="mt-1 flex items-center gap-3 rounded-xl p-3" style={{ border: "1px solid var(--border)", background: "var(--bg-hover)" }}>
         <button className="flex items-center gap-2 truncate text-sm font-semibold hover:underline" style={{ color: "var(--text)" }} onClick={() => onSelectPerson(edge.sourceId)}>
-          <Avatar p={{ name: source?.name ?? "?", avatarUrl: source?.avatarUrl ?? null, isSelf: false }} size={32} />
+          <Avatar p={{ name: source?.name ?? "?", avatarUrl: source?.avatarUrl ?? null }} size={32} />
           <span className="truncate">{source?.name ?? "?"}</span>
         </button>
         <span className="shrink-0 px-1 text-xs" style={{ color: ORIGINS[edge.origin].color }}>↔</span>
         <button className="flex items-center gap-2 truncate text-sm font-semibold hover:underline" style={{ color: "var(--text)" }} onClick={() => onSelectPerson(edge.targetId)}>
-          <Avatar p={{ name: target?.name ?? "?", avatarUrl: target?.avatarUrl ?? null, isSelf: false }} size={32} />
+          <Avatar p={{ name: target?.name ?? "?", avatarUrl: target?.avatarUrl ?? null }} size={32} />
           <span className="truncate">{target?.name ?? "?"}</span>
         </button>
       </div>

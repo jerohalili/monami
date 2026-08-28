@@ -34,7 +34,6 @@ export interface Person {
   notes: string | null;
   links: Record<string, string>;
   githubLogin: string | null;
-  isSelf: boolean;
 }
 
 export interface Relationship {

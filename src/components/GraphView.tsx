@@ -162,16 +162,44 @@ export default function GraphView({
   }, [graphData]);
 
   // Configure charge force: weaker repulsion for unconnected nodes.
+  // Add center attraction to keep nodes from drifting too far from the "You" node.
   useEffect(() => {
     const g = fgRef.current;
     if (!g) return;
+
+    // Charge (repulsion): weaker for unconnected nodes
     const charge = g.d3Force("charge");
-    if (!charge) return;
-    charge.strength((n: object) => {
-      const node = n as GNode;
-      // Unconnected nodes get 1/5 the normal repulsion
-      return (node.degree ?? 0) === 0 ? -30 : -150;
-    });
+    if (charge) {
+      charge.strength((n: object) => {
+        const node = n as GNode;
+        return (node.degree ?? 0) === 0 ? -30 : -150;
+      });
+    }
+
+    // Center attraction: pulls nodes toward the "You" node
+    // Stronger pull for unconnected nodes to keep them near the cluster
+    const centerX = g.d3Force("x");
+    const centerY = g.d3Force("y");
+    if (centerX && centerY) {
+      centerX.strength((n: object) => {
+        const node = n as GNode;
+        return (node.degree ?? 0) === 0 ? 0.15 : 0.03;
+      }).x((n: object) => {
+        const node = n as GNode;
+        // Find the "You" node and use its x position as target
+        const youNode = graphData.nodes.find((nd) => isYouNode(nd));
+        return youNode?.x ?? 0;
+      });
+      centerY.strength((n: object) => {
+        const node = n as GNode;
+        return (node.degree ?? 0) === 0 ? 0.15 : 0.03;
+      }).y((n: object) => {
+        const node = n as GNode;
+        // Find the "You" node and use its y position as target
+        const youNode = graphData.nodes.find((nd) => isYouNode(nd));
+        return youNode?.y ?? 0;
+      });
+    }
   }, [graphData]);
 
   // Neighbor set for the selected person.
@@ -204,8 +232,11 @@ export default function GraphView({
     return undefined;
   }
 
+  const isYouNode = (n: GNode) =>
+    n.name === "You" && !n.headline && !n.company && !n.location;
+
   const radiusOf = (n: GNode) =>
-    5 + Math.min(n.degree, 10) * 0.9 + (n.isSelf ? 4 : 0);
+    5 + Math.min(n.degree, 10) * 0.9 + (isYouNode(n) ? 4 : 0);
 
   // Define clickable hit area for each node (required when nodeCanvasObjectMode is "replace").
   const paintPointerArea = (raw: object, color: string, ctx: CanvasRenderingContext2D, _globalScale: number) => {
@@ -227,6 +258,7 @@ export default function GraphView({
     const isSel = n.id === selectedPersonId;
     const isNb = neighborIds?.has(n.id) ?? false;
     const isHover = n.id === hoverNode;
+    const isY = isYouNode(n);
     const dimmed = matchedIds !== null && !matchedIds.has(n.id);
     const alpha = dimmed ? 0.12 : 1;
 
@@ -270,7 +302,7 @@ export default function GraphView({
     if (!drewAvatar) {
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = n.isSelf ? "#fbbf24" : colorForName(n.name);
+      ctx.fillStyle = isY ? "#fbbf24" : colorForName(n.name);
       ctx.fill();
       const fs = r * (initialsOf(n.name).length > 1 ? 0.9 : 1.2);
       ctx.font = `600 ${fs}px system-ui, sans-serif`;
@@ -282,10 +314,10 @@ export default function GraphView({
     ctx.shadowBlur = 0;
 
     // Border ring.
-    if (n.isSelf || isSel) {
+    if (isY || isSel) {
       ctx.beginPath();
       ctx.arc(cx, cy, r + 2.5 / scale, 0, Math.PI * 2);
-      ctx.strokeStyle = n.isSelf && !isSel ? "#fbbf24" : "#ffffff";
+      ctx.strokeStyle = isY && !isSel ? "#fbbf24" : "#ffffff";
       ctx.lineWidth = 2 / scale;
       ctx.stroke();
     } else if (isNb || isHover) {
