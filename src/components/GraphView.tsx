@@ -74,6 +74,7 @@ export default function GraphView({
   const avatarCache = useRef(new Map<string, HTMLImageElement>());
   const nodeMapRef = useRef(new Map<string, GNode>());
   const pendingPinRef = useRef<{ id: string; x: number; y: number } | null>(null);
+  const nodeSigRef = useRef<string>("");
 
   // Track container size.
   useEffect(() => {
@@ -203,11 +204,19 @@ export default function GraphView({
     // was fighting the anchor-to-"You"-node forces above, which is what pushed
     // unconnected nodes off toward a competing center instead of settling near the cluster.
     g.d3Force("center", null);
-    // Reheat so these forces are guaranteed to actually act on the nodes now,
-    // rather than only from the next externally-triggered reheat (e.g. the next
-    // data edit) — this is what makes the fix apply on initial load too, see
-    // the engineReady dependency below.
-    g.d3ReheatSimulation();
+    // Only reheat when the actual set of nodes in the simulation changed —
+    // not on every referential change of `graphData`. That memo also changes
+    // reference when unrelated state updates (e.g. pendingPlacement toggling,
+    // or a data refresh where a pending node is still excluded) cause it to
+    // recompute, even though the node list is identical. Reheating on every
+    // such reference change caused a visible jolt with no real layout change
+    // behind it — including, ironically, jolts while a new node was still
+    // pending placement and hadn't entered the simulation at all.
+    const nodeSig = graphData.nodes.map((n) => n.id).sort().join(",");
+    if (nodeSig !== nodeSigRef.current) {
+      nodeSigRef.current = nodeSig;
+      g.d3ReheatSimulation();
+    }
   }, [graphData, engineReady]);
 
   // Neighbor set for the selected person.
