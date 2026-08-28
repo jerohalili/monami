@@ -20,6 +20,13 @@ import {
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
+// Cubic in-out easing: slow start → fast middle → slow end.
+function cubicInOut(t: number): number {
+  return t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 // --- Types ---
 
 export interface GraphApi {
@@ -83,10 +90,14 @@ export default function GraphView({
   const isDraggingRef = useRef(false);
   const dragNodeIdRef = useRef<string | null>(null);
   const pendingReheatRef = useRef(false);
+  const pendingFitRef = useRef(false);
+  const placingRef = useRef(false);
+  const placingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphDataRef = useRef<{ nodes: GNode[]; links: (Relationship & { source: string; target: string })[]; _nodeSig: string; _linkSig: string }>({ nodes: [], links: [], _nodeSig: "", _linkSig: "" });
   const unpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinnedByAddTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevNodeCountRef = useRef<number | null>(null);
+  const initialFitRafRef = useRef<number | null>(null);
 
   // Track container size.
   useEffect(() => {
@@ -181,21 +192,43 @@ export default function GraphView({
     return result;
   }, [data, pendingPlacement]);
 
-  // Fit when new nodes are added or removed.
+  // Flag a deferred fit when new nodes are added or removed.
+  // On increase, the fit fires on onEngineStop so the simulation has settled.
+  // On decrease, we also fire fit immediately so the view centers before pins
+  // release and nodes drift off-screen.
   const prevCount = useRef(graphData.nodes.length);
   const didInitialFit = useRef(false);
   const didMarkEngineReady = useRef(false);
   useEffect(() => {
     if (graphData.nodes.length > prevCount.current) {
-      // Skip fit if user click-placed (they positioned it intentionally).
-      if (!pendingPinRef.current) {
-        try { fgRef.current?.zoomToFit(400, 90); } catch { /* noop */ }
+      // Always flag fit — works for both click-placed and auto-added nodes.
+      pendingFitRef.current = true;
+      // Track placement window to block spurious fits from load()'s render.
+      if (pendingPinRef.current) {
+        placingRef.current = true;
+        if (placingTimerRef.current) clearTimeout(placingTimerRef.current);
+        placingTimerRef.current = setTimeout(() => {
+          placingRef.current = false;
+          placingTimerRef.current = null;
+        }, 1500);
       }
     } else if (prevCount.current !== null && graphData.nodes.length < prevCount.current) {
-      try { fgRef.current?.zoomToFit(400, 90); } catch { /* noop */ }
+      // Only flag a fit for real deletions, not for the second graphData
+      // change that load() produces during a click-placement flow.
+      if (!placingRef.current) {
+        pendingFitRef.current = true;
+      }
     }
     prevCount.current = graphData.nodes.length;
   }, [graphData]);
+
+  // Clean up placement-blocking timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (placingTimerRef.current) clearTimeout(placingTimerRef.current);
+      if (initialFitRafRef.current !== null) cancelAnimationFrame(initialFitRafRef.current);
+    };
+  }, []);
 
   // Unpin placed node after physics settles.
   // Uses a ref-based timer so it survives re-renders — the cleanup MUST fire
@@ -362,6 +395,40 @@ export default function GraphView({
 
   const radiusOf = (n: GNode) =>
     5 + Math.min(n.degree, 10) * 0.9 + (isYouNode(n) ? 4 : 0);
+
+  // Smooth fit-to-graph animation using cubic in-out easing.
+  // Uses centerAt/zoom with duration=0 on each frame to avoid the library's
+  // dual-tween decoupling and the onFinishUpdate auto-zoom override.
+  function fitGraph(duration = 400): number | null {
+    const g = fgRef.current;
+    if (!g || graphData.nodes.length === 0) return null;
+    const bbox = g.getGraphBbox();
+    if (!bbox) return null;
+    const cx = (bbox.x[0] + bbox.x[1]) / 2;
+    const cy = (bbox.y[0] + bbox.y[1]) / 2;
+    const zk = Math.max(1e-12, Math.min(1e12,
+      (size.w - 180) / (bbox.x[1] - bbox.x[0]),
+      (size.h - 180) / (bbox.y[1] - bbox.y[0]),
+    ));
+    const startCenter = g.centerAt();
+    const startZoom = g.zoom();
+    const startTime = performance.now();
+    let rafId: number | null = null;
+    const tick = () => {
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const e = cubicInOut(t);
+      g.centerAt(
+        startCenter.x + (cx - startCenter.x) * e,
+        startCenter.y + (cy - startCenter.y) * e,
+        0,
+      );
+      g.zoom(startZoom + (zk * 1.0001 - startZoom) * e, 0);
+      if (t < 1) rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return rafId;
+  }
 
   // Define clickable hit area for each node (required when nodeCanvasObjectMode is "replace").
   const paintPointerArea = (raw: object, color: string, ctx: CanvasRenderingContext2D, _globalScale: number) => {
@@ -610,10 +677,6 @@ export default function GraphView({
               didMarkEngineReady.current = true;
               setEngineReady(true);
             }
-            if (!didInitialFit.current && graphData.nodes.length > 0) {
-              didInitialFit.current = true;
-              try { fgRef.current?.zoomToFit(0, 110); } catch { /* noop */ }
-            }
           }}
           onEngineStop={() => {
             if (!didMarkEngineReady.current) {
@@ -622,7 +685,14 @@ export default function GraphView({
             }
             if (!didInitialFit.current && graphData.nodes.length > 0) {
               didInitialFit.current = true;
-              try { fgRef.current?.zoomToFit(0, 110); } catch { /* noop */ }
+              initialFitRafRef.current = fitGraph(1200);
+            } else if (pendingFitRef.current) {
+              pendingFitRef.current = false;
+              if (initialFitRafRef.current !== null) {
+                cancelAnimationFrame(initialFitRafRef.current);
+                initialFitRafRef.current = null;
+              }
+              initialFitRafRef.current = fitGraph(400);
             }
           }}
           onBackgroundClick={(e: MouseEvent) => {
@@ -642,7 +712,7 @@ export default function GraphView({
           }}
           cooldownTime={1000}
           cooldownTicks={100}
-          warmupTicks={50}
+          warmupTicks={200}
         />
       )}
 
