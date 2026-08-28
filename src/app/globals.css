@@ -21,11 +21,11 @@
   --bg-card: #ffffff;
   --bg-hover: rgba(0, 0, 0, 0.08);
   --bg-input: rgba(0, 0, 0, 0.03);
-  --text: #1e293b;
-  --text-muted: #64748b;
-  --text-dim: #94a3b8;
-  --border: rgba(0, 0, 0, 0.1);
-  --border-strong: rgba(0, 0, 0, 0.2);
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #64748b;
+  --border: rgba(0, 0, 0, 0.15);
+  --border-strong: rgba(0, 0, 0, 0.25);
   --shadow: rgba(0, 0, 0, 0.1);
 }
 

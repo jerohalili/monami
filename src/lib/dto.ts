@@ -46,7 +46,7 @@ export function personDTO(p: PersonRow): Person {
     id: p.id,
     name: p.name,
     nickname: p.nickname,
-    avatarUrl: p.avatarUrl ?? autoAvatarUrl(p.name),
+    avatarUrl: p.avatarUrl ?? autoAvatarUrl(p.name === "You" ? "Wren" : p.name),
     headline: p.headline,
     company: p.company,
     location: p.location,
