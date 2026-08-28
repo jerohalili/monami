@@ -187,25 +187,12 @@ export default function GraphView({
   const didMarkEngineReady = useRef(false);
   useEffect(() => {
     if (graphData.nodes.length > prevCount.current) {
-      // New node added — fit after physics settles.
-      // Skip if the user just manually placed the node themselves (pinned via
-      // click-to-place): re-centering the camera right after that is a second,
-      // unwanted jolt on top of the one they just intentionally caused.
-      const t = setTimeout(() => {
-        if (pendingPinRef.current) return;
-        try { fgRef.current?.zoomToFit(400, 100); } catch { /* noop */ }
-      }, 250);
-      prevCount.current = graphData.nodes.length;
-      return () => clearTimeout(t);
+      // Skip fit if user click-placed (they positioned it intentionally).
+      if (!pendingPinRef.current) {
+        try { fgRef.current?.zoomToFit(400, 90); } catch { /* noop */ }
+      }
     } else if (prevCount.current !== null && graphData.nodes.length < prevCount.current) {
-      // Node deleted — smooth animated reframe over 400ms.
-      // 50ms delay lets the library's onFinishUpdate auto-zoom fire and the
-      // simulation tick once, so zoomToFit computes the correct bounding box.
-      const t = setTimeout(() => {
-        try { fgRef.current?.zoomToFit(400, 100); } catch { /* noop */ }
-      }, 50);
-      prevCount.current = graphData.nodes.length;
-      return () => clearTimeout(t);
+      try { fgRef.current?.zoomToFit(400, 90); } catch { /* noop */ }
     }
     prevCount.current = graphData.nodes.length;
   }, [graphData]);
@@ -654,6 +641,8 @@ export default function GraphView({
             onSelectEdge(null);
           }}
           cooldownTime={1000}
+          cooldownTicks={100}
+          warmupTicks={50}
         />
       )}
 
