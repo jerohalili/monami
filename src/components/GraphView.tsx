@@ -82,6 +82,10 @@ export default function GraphView({
   const isDraggingRef = useRef(false);
   const dragNodeIdRef = useRef<string | null>(null);
   const pendingReheatRef = useRef(false);
+  const graphDataRef = useRef<{ nodes: GNode[]; links: (Relationship & { source: string; target: string })[]; _nodeSig: string; _linkSig: string }>({ nodes: [], links: [], _nodeSig: "", _linkSig: "" });
+  const unpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pinnedByAddTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevNodeCountRef = useRef<number | null>(null);
 
   // Track container size.
   useEffect(() => {
@@ -163,7 +167,17 @@ export default function GraphView({
       }
       links.push(existing);
     }
-    return { nodes, links };
+    // Cache: return the same object reference when node IDs and link topology
+    // are unchanged.  react-force-graph reinitializes on every new reference,
+    // so preserving identity here is the primary defence against jolts on
+    // metadata-only edits.
+    const nodeSig = nodes.map((n) => n.id).sort().join(",");
+    const linkSig = links.map((l) => `${lid(l.source)}->${lid(l.target)}`).sort().join(",");
+    const prev = graphDataRef.current;
+    if (nodeSig === prev._nodeSig && linkSig === prev._linkSig) return prev;
+    const result = { nodes, links, _nodeSig: nodeSig, _linkSig: linkSig };
+    graphDataRef.current = result;
+    return result;
   }, [data, pendingPlacement]);
 
   // Fit when new nodes are added.
@@ -179,7 +193,7 @@ export default function GraphView({
       const t = setTimeout(() => {
         if (pendingPinRef.current) return;
         try { fgRef.current?.zoomToFit(400, 100); } catch { /* noop */ }
-      }, 400);
+      }, 250);
       prevCount.current = graphData.nodes.length;
       return () => clearTimeout(t);
     }
@@ -187,15 +201,20 @@ export default function GraphView({
   }, [graphData]);
 
   // Unpin placed node after physics settles.
+  // Uses a ref-based timer so it survives re-renders — the cleanup MUST fire
+  // even if graphData changes again before the timeout (e.g. a data refresh
+  // during the unpin window).  Previous impl used effect cleanup which could
+  // cancel the timer and permanently freeze the node.
   useEffect(() => {
     const pin = pendingPinRef.current;
     if (!pin) return;
-    const t = setTimeout(() => {
+    if (unpinTimerRef.current) clearTimeout(unpinTimerRef.current);
+    unpinTimerRef.current = setTimeout(() => {
       const n = nodeMapRef.current.get(pin.id);
       if (n) { n.fx = undefined; n.fy = undefined; }
       pendingPinRef.current = null;
-    }, 1500);
-    return () => clearTimeout(t);
+      unpinTimerRef.current = null;
+    }, 200);
   }, [graphData]);
 
   // Configure charge force: weaker repulsion for unconnected nodes.
@@ -250,9 +269,12 @@ export default function GraphView({
       nodeSigRef.current = nodeSig;
       linkSigRef.current = linkSig;
 
+      // Track node count for deletion detection
+      const prevCount = prevNodeCountRef.current;
+      prevNodeCountRef.current = graphData.nodes.length;
+
       // When a new node was just added, pin existing nodes temporarily so the
-      // new node settles into place without dragging the whole layout.  They
-      // are unpinned after 1.5 s — long enough for the simulation to converge.
+      // new node settles into place without dragging the whole layout.
       if (addedNodeRef.current) {
         addedNodeRef.current = false;
         const pinned = new Set<string>();
@@ -264,7 +286,8 @@ export default function GraphView({
           }
         }
         pinnedByAddRef.current = pinned;
-        setTimeout(() => {
+        if (pinnedByAddTimerRef.current) clearTimeout(pinnedByAddTimerRef.current);
+        pinnedByAddTimerRef.current = setTimeout(() => {
           for (const n of graphData.nodes) {
             if (pinned.has(n.id)) {
               n.fx = undefined;
@@ -272,7 +295,29 @@ export default function GraphView({
             }
           }
           pinnedByAddRef.current = new Set();
-        }, 1500);
+          pinnedByAddTimerRef.current = null;
+        }, 200);
+      } else if (prevCount !== null && graphData.nodes.length < prevCount) {
+        // Node deleted — pin remaining nodes so only the deleted node's
+        // absence causes a localized rebalance, not a global reshuffle.
+        const pinned = new Set<string>();
+        for (const n of graphData.nodes) {
+          if (n.fx === undefined && n.fy === undefined) {
+            pinned.add(n.id);
+            n.fx = n.x;
+            n.fy = n.y;
+          }
+        }
+        if (pinnedByAddTimerRef.current) clearTimeout(pinnedByAddTimerRef.current);
+        pinnedByAddTimerRef.current = setTimeout(() => {
+          for (const n of graphData.nodes) {
+            if (pinned.has(n.id)) {
+              n.fx = undefined;
+              n.fy = undefined;
+            }
+          }
+          pinnedByAddTimerRef.current = null;
+        }, 200);
       }
 
       // Defer reheat if a node is being dragged — reheating mid-drag causes
@@ -560,7 +605,7 @@ export default function GraphView({
               fgRef.current?.d3ReheatSimulation();
             }
           }}
-          enablePanInteraction={(e: MouseEvent) => !isDraggingRef.current}
+          enablePanInteraction={(e: MouseEvent) => !isDraggingRef.current && !pendingPlacement}
           onLinkClick={(l: object) => onSelectEdge((l as Relationship).id)}
           onLinkHover={(l: object | null) => setHoverLink(l ? (l as Relationship) : null)}
           onEngineTick={() => {
@@ -643,9 +688,29 @@ export default function GraphView({
       )}
 
       {pendingPlacement && (
-        <div className="pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 rounded-full px-4 py-1.5 text-sm font-medium shadow-lg backdrop-blur" style={{ top: 80, border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text)" }}>
-          Click anywhere to place <span className="font-semibold text-violet-400">{pendingPlacement.name}</span>
-        </div>
+        <>
+          {/* Banner */}
+          <div className="pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 rounded-full px-4 py-1.5 text-sm font-medium shadow-lg backdrop-blur" style={{ top: 80, border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text)" }}>
+            Click anywhere to place <span className="font-semibold text-violet-400">{pendingPlacement.name}</span>
+          </div>
+          {/* Cursor-following node preview */}
+          <div
+            className="pointer-events-none absolute z-50 flex items-center justify-center rounded-full"
+            style={{
+              left: tipPos.x - 14,
+              top: tipPos.y - 14,
+              width: 28,
+              height: 28,
+              background: colorForName(pendingPlacement.name),
+              border: "2px solid #8b5cf6",
+              boxShadow: "0 0 12px rgba(139,92,246,0.5)",
+            }}
+          >
+            <span className="text-[10px] font-semibold" style={{ color: "#0b101d" }}>
+              {initialsOf(pendingPlacement.name)}
+            </span>
+          </div>
+        </>
       )}
     </div>
   );
