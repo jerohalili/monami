@@ -269,8 +269,18 @@ export default function NetworkApp() {
           onClose={() => setShowAddPerson(false)}
           onCreated={async (person: Person) => {
             setShowAddPerson(false);
-            await load();
+            // Mark as pending *before* refreshing data. GraphView excludes a
+            // pending node from graphData (and therefore from the physics
+            // simulation) only while pendingPlacement is already set at the
+            // moment the node first appears in `data`. If load() ran first,
+            // there'd be a render where the new person is in `data` but
+            // pendingPlacement is still null — GraphView would add it to its
+            // persistent node map right then, and once it's in that map the
+            // later pendingPlacement can no longer hide it. Setting it first
+            // avoids that window entirely, so the graph only reacts once the
+            // user actually clicks to place the node.
             setPendingPlacement({ id: person.id, name: person.name });
+            await load();
           }}
         />
       )}
