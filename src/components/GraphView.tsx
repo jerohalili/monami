@@ -6,6 +6,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
+import { forceX, forceY } from "d3-force-3d";
 import {
   ORIGINS,
   colorForName,
@@ -139,9 +140,13 @@ export default function GraphView({
   const didInitialFit = useRef(false);
   useEffect(() => {
     if (graphData.nodes.length > prevCount.current) {
-      // New node added — fit after physics settles
+      // New node added — fit after physics settles.
+      // Skip if the user just manually placed the node themselves (pinned via
+      // click-to-place): re-centering the camera right after that is a second,
+      // unwanted jolt on top of the one they just intentionally caused.
       const t = setTimeout(() => {
-        try { fgRef.current?.zoomToFit(200, 100); } catch { /* noop */ }
+        if (pendingPinRef.current) return;
+        try { fgRef.current?.zoomToFit(400, 100); } catch { /* noop */ }
       }, 400);
       prevCount.current = graphData.nodes.length;
       return () => clearTimeout(t);
@@ -178,28 +183,24 @@ export default function GraphView({
 
     // Center attraction: pulls nodes toward the "You" node
     // Stronger pull for unconnected nodes to keep them near the cluster
-    const centerX = g.d3Force("x");
-    const centerY = g.d3Force("y");
-    if (centerX && centerY) {
-      centerX.strength((n: object) => {
-        const node = n as GNode;
-        return (node.degree ?? 0) === 0 ? 0.15 : 0.03;
-      }).x((n: object) => {
-        const node = n as GNode;
-        // Find the "You" node and use its x position as target
-        const youNode = graphData.nodes.find((nd) => isYouNode(nd));
-        return youNode?.x ?? 0;
-      });
-      centerY.strength((n: object) => {
-        const node = n as GNode;
-        return (node.degree ?? 0) === 0 ? 0.15 : 0.03;
-      }).y((n: object) => {
-        const node = n as GNode;
-        // Find the "You" node and use its y position as target
-        const youNode = graphData.nodes.find((nd) => isYouNode(nd));
-        return youNode?.y ?? 0;
-      });
-    }
+    // NOTE: 'x'/'y' aren't registered by default (only 'link'/'charge'/'center' are),
+    // so d3Force("x")/d3Force("y") always returned undefined and this block was a
+    // silent no-op — the "keep unconnected nodes near the cluster" fix never actually
+    // ran, which is why they kept drifting.
+    const xForce = forceX((n: object) => {
+      const youNode = graphData.nodes.find((nd) => isYouNode(nd));
+      return youNode?.x ?? 0;
+    }).strength((n: object) => ((n as GNode).degree ?? 0) === 0 ? 0.15 : 0.03);
+    const yForce = forceY((n: object) => {
+      const youNode = graphData.nodes.find((nd) => isYouNode(nd));
+      return youNode?.y ?? 0;
+    }).strength((n: object) => ((n as GNode).degree ?? 0) === 0 ? 0.15 : 0.03);
+    g.d3Force("x", xForce);
+    g.d3Force("y", yForce);
+    // Drop the default 'center' force — it recenters on graph-space (0,0) and
+    // was fighting the anchor-to-"You"-node forces above, which is what pushed
+    // unconnected nodes off toward a competing center instead of settling near the cluster.
+    g.d3Force("center", null);
   }, [graphData]);
 
   // Neighbor set for the selected person.
@@ -495,7 +496,6 @@ export default function GraphView({
             onSelectEdge(null);
           }}
           cooldownTime={1000}
-          warmupTicks={50}
         />
       )}
 
