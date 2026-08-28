@@ -60,6 +60,7 @@ export default function GraphView({
   apiRef,
   pendingPlacement,
   onPlaceNode,
+  onReady,
 }: {
   data: GraphPayload;
   matchedIds: Set<string> | null;
@@ -70,6 +71,7 @@ export default function GraphView({
   apiRef: React.MutableRefObject<GraphApi | null>;
   pendingPlacement: { id: string; name: string } | null;
   onPlaceNode: () => void;
+  onReady?: () => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
@@ -112,14 +114,8 @@ export default function GraphView({
   // Expose zoom/fit/camera methods via apiRef.
   useEffect(() => {
     apiRef.current = {
-      zoomIn: (t) => {
-        const g = fgRef.current;
-        if (g) g.zoom(g.zoom() * 1.3, t ?? 200);
-      },
-      zoomOut: (t) => {
-        const g = fgRef.current;
-        if (g) g.zoom(g.zoom() / 1.3, t ?? 200);
-      },
+      zoomIn: (t) => { zoomBy(1.3, t ?? 300); },
+      zoomOut: (t) => { zoomBy(1 / 1.3, t ?? 300); },
       fit: (t) => fgRef.current?.zoomToFit(t ?? 400, 90),
     };
     return () => { apiRef.current = null; };
@@ -396,22 +392,17 @@ export default function GraphView({
   const radiusOf = (n: GNode) =>
     5 + Math.min(n.degree, 10) * 0.9 + (isYouNode(n) ? 4 : 0);
 
-  // Smooth fit-to-graph animation using cubic in-out easing.
+  // Smooth camera animation using cubic in-out easing.
   // Uses centerAt/zoom with duration=0 on each frame to avoid the library's
   // dual-tween decoupling and the onFinishUpdate auto-zoom override.
-  function fitGraph(duration = 400): number | null {
+  // `targetCenter: null` keeps the current center (used for in-place zoom in/out).
+  function animateCamera(targetCenter: { x: number; y: number } | null, targetZoom: number, duration: number): number | null {
     const g = fgRef.current;
-    if (!g || graphData.nodes.length === 0) return null;
-    const bbox = g.getGraphBbox();
-    if (!bbox) return null;
-    const cx = (bbox.x[0] + bbox.x[1]) / 2;
-    const cy = (bbox.y[0] + bbox.y[1]) / 2;
-    const zk = Math.max(1e-12, Math.min(1e12,
-      (size.w - 180) / (bbox.x[1] - bbox.x[0]),
-      (size.h - 180) / (bbox.y[1] - bbox.y[0]),
-    ));
+    if (!g) return null;
     const startCenter = g.centerAt();
     const startZoom = g.zoom();
+    const cx = targetCenter ? targetCenter.x : startCenter.x;
+    const cy = targetCenter ? targetCenter.y : startCenter.y;
     const startTime = performance.now();
     let rafId: number | null = null;
     const tick = () => {
@@ -423,11 +414,33 @@ export default function GraphView({
         startCenter.y + (cy - startCenter.y) * e,
         0,
       );
-      g.zoom(startZoom + (zk * 1.0001 - startZoom) * e, 0);
+      g.zoom(startZoom + (targetZoom - startZoom) * e, 0);
       if (t < 1) rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
     return rafId;
+  }
+
+  // Fit-to-graph: same tween, target computed from the current graph bbox.
+  function fitGraph(duration = 400): number | null {
+    const g = fgRef.current;
+    if (!g || graphData.nodes.length === 0) return null;
+    const bbox = g.getGraphBbox();
+    if (!bbox) return null;
+    const cx = (bbox.x[0] + bbox.x[1]) / 2;
+    const cy = (bbox.y[0] + bbox.y[1]) / 2;
+    const zk = Math.max(1e-12, Math.min(1e12,
+      (size.w - 180) / (bbox.x[1] - bbox.x[0]),
+      (size.h - 180) / (bbox.y[1] - bbox.y[0]),
+    ));
+    return animateCamera({ x: cx, y: cy }, zk * 1.0001, duration);
+  }
+
+  // Zoom in/out around the current center: same tween, target = current zoom * factor.
+  function zoomBy(factor: number, duration = 300): number | null {
+    const g = fgRef.current;
+    if (!g) return null;
+    return animateCamera(null, g.zoom() * factor, duration);
   }
 
   // Define clickable hit area for each node (required when nodeCanvasObjectMode is "replace").
@@ -685,7 +698,9 @@ export default function GraphView({
             }
             if (!didInitialFit.current && graphData.nodes.length > 0) {
               didInitialFit.current = true;
-              initialFitRafRef.current = fitGraph(1200);
+              // Instant fit — graph appears already zoom-fitted, no animation.
+              fgRef.current?.zoomToFit(0, 90);
+              onReady?.();
             } else if (pendingFitRef.current) {
               pendingFitRef.current = false;
               if (initialFitRafRef.current !== null) {

@@ -35,6 +35,7 @@ export default function NetworkApp() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [showAddEdge, setShowAddEdge] = useState(false);
   const [pendingPlacement, setPendingPlacement] = useState<{ id: string; name: string } | null>(null);
+  const [graphReady, setGraphReady] = useState(false);
   const apiRef = useRef<GraphApi | null>(null);
 
   // --- Data fetching ---
@@ -138,7 +139,18 @@ export default function NetworkApp() {
           await load();
           if (p) selectPerson(p.id);
         }}
+        onReady={() => setGraphReady(true)}
       />
+
+      {/* Loading overlay — covers everything while simulation runs */}
+      {!graphReady && data && data.people.length > 0 && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ color: "var(--text-muted)", background: "var(--bg)" }}>
+          <div className="flex flex-col items-center gap-3">
+            <IconLogo width={36} height={36} className="animate-pulse text-violet-400" />
+            <p className="text-sm">Charting your constellation...</p>
+          </div>
+        </div>
+      )}
 
       {/* Header bar */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-wrap items-center gap-2 p-3">
