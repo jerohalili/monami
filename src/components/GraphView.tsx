@@ -66,6 +66,7 @@ export default function GraphView({
   const wrapRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [engineReady, setEngineReady] = useState(false);
   const [hoverNode, setHoverNode] = useState<string | null>(null);
   const [hoverLink, setHoverLink] = useState<Relationship | null>(null);
   const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
@@ -138,6 +139,7 @@ export default function GraphView({
   // Fit when new nodes are added.
   const prevCount = useRef(graphData.nodes.length);
   const didInitialFit = useRef(false);
+  const didMarkEngineReady = useRef(false);
   useEffect(() => {
     if (graphData.nodes.length > prevCount.current) {
       // New node added — fit after physics settles.
@@ -201,7 +203,12 @@ export default function GraphView({
     // was fighting the anchor-to-"You"-node forces above, which is what pushed
     // unconnected nodes off toward a competing center instead of settling near the cluster.
     g.d3Force("center", null);
-  }, [graphData]);
+    // Reheat so these forces are guaranteed to actually act on the nodes now,
+    // rather than only from the next externally-triggered reheat (e.g. the next
+    // data edit) — this is what makes the fix apply on initial load too, see
+    // the engineReady dependency below.
+    g.d3ReheatSimulation();
+  }, [graphData, engineReady]);
 
   // Neighbor set for the selected person.
   const neighborIds = useMemo(() => {
@@ -469,12 +476,20 @@ export default function GraphView({
           onLinkClick={(l: object) => onSelectEdge((l as Relationship).id)}
           onLinkHover={(l: object | null) => setHoverLink(l ? (l as Relationship) : null)}
           onEngineTick={() => {
+            if (!didMarkEngineReady.current) {
+              didMarkEngineReady.current = true;
+              setEngineReady(true);
+            }
             if (!didInitialFit.current && graphData.nodes.length > 0) {
               didInitialFit.current = true;
               try { fgRef.current?.zoomToFit(0, 110); } catch { /* noop */ }
             }
           }}
           onEngineStop={() => {
+            if (!didMarkEngineReady.current) {
+              didMarkEngineReady.current = true;
+              setEngineReady(true);
+            }
             if (!didInitialFit.current && graphData.nodes.length > 0) {
               didInitialFit.current = true;
               try { fgRef.current?.zoomToFit(0, 110); } catch { /* noop */ }
