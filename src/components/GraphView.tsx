@@ -93,11 +93,11 @@ export default function GraphView({
   const dragNodeIdRef = useRef<string | null>(null);
   const pendingReheatRef = useRef(false);
   const pendingFitRef = useRef(false);
-  const placingRef = useRef(false);
-  const placingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphDataRef = useRef<{ nodes: GNode[]; links: (Relationship & { source: string; target: string })[]; _nodeSig: string; _linkSig: string }>({ nodes: [], links: [], _nodeSig: "", _linkSig: "" });
   const unpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinnedByAddTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didInitialFit = useRef(false);
+  const didMarkEngineReady = useRef(false);
   const prevNodeCountRef = useRef<number | null>(null);
   const initialFitRafRef = useRef<number | null>(null);
 
@@ -193,51 +193,13 @@ export default function GraphView({
     // so preserving identity here is the primary defence against jolts on
     // metadata-only edits.
     const nodeSig = nodes.map((n) => n.id).sort().join(",");
-    const linkSig = links.map((l) => `${lid(l.source)}->${lid(l.target)}:${l.strength}:${l.origin}`).sort().join(",");
+    const linkSig = links.map((l) => `${lid(l.source)}->${lid(l.target)}`).sort().join(",");
     const prev = graphDataRef.current;
     if (nodeSig === prev._nodeSig && linkSig === prev._linkSig) return prev;
     const result = { nodes, links, _nodeSig: nodeSig, _linkSig: linkSig };
     graphDataRef.current = result;
     return result;
   }, [data, pendingPlacement]);
-
-  // Flag a deferred fit when new nodes are added or removed.
-  // On increase, the fit fires on onEngineStop so the simulation has settled.
-  // On decrease, we also fire fit immediately so the view centers before pins
-  // release and nodes drift off-screen.
-  const prevCount = useRef(graphData.nodes.length);
-  const didInitialFit = useRef(false);
-  const didMarkEngineReady = useRef(false);
-  useEffect(() => {
-    if (graphData.nodes.length > prevCount.current) {
-      // Always flag fit — works for both click-placed and auto-added nodes.
-      pendingFitRef.current = true;
-      // Track placement window to block spurious fits from load()'s render.
-      if (pendingPinRef.current) {
-        placingRef.current = true;
-        if (placingTimerRef.current) clearTimeout(placingTimerRef.current);
-        placingTimerRef.current = setTimeout(() => {
-          placingRef.current = false;
-          placingTimerRef.current = null;
-        }, 1500);
-      }
-    } else if (prevCount.current !== null && graphData.nodes.length < prevCount.current) {
-      // Only flag a fit for real deletions, not for the second graphData
-      // change that load() produces during a click-placement flow.
-      if (!placingRef.current) {
-        pendingFitRef.current = true;
-      }
-    }
-    prevCount.current = graphData.nodes.length;
-  }, [graphData]);
-
-  // Clean up placement-blocking timer on unmount.
-  useEffect(() => {
-    return () => {
-      if (placingTimerRef.current) clearTimeout(placingTimerRef.current);
-      if (initialFitRafRef.current !== null) cancelAnimationFrame(initialFitRafRef.current);
-    };
-  }, []);
 
   // Unpin placed node after physics settles.
   // Uses a ref-based timer so it survives re-renders — the cleanup MUST fire
