@@ -387,7 +387,7 @@ export default function GraphView({
   }
 
   const isYouNode = (n: GNode) =>
-    n.name === "You" && !n.headline && !n.company && !n.location;
+    n.tags.includes("me");
 
   const radiusOf = (n: GNode) =>
     5 + Math.min(n.degree, 10) * 0.9 + (isYouNode(n) ? 4 : 0);

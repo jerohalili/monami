@@ -68,20 +68,46 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
         }
 
+        // Store GitHub access token for API calls
+        if (account.access_token) {
+          await db.user.update({
+            where: { id: existingUser.id },
+            data: {
+              githubToken: account.access_token,
+              githubTokenExpiry: account.expires_at
+                ? new Date(account.expires_at * 1000)
+                : null,
+            },
+          });
+        }
+
         // Update user ID for JWT
         user.id = existingUser.id;
       }
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
+      }
+      // Include githubId from account on GitHub sign-in
+      if (account?.provider === "github" && user?.id) {
+        const dbUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: { githubId: true },
+        });
+        if (dbUser?.githubId) {
+          token.githubId = dbUser.githubId;
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
+      }
+      if (session.user && token.githubId) {
+        (session.user as { githubId?: string }).githubId = token.githubId as string;
       }
       return session;
     },

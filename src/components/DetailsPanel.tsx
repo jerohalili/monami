@@ -5,11 +5,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { signIn } from "next-auth/react";
 import {
   ORIGINS, nodeColor, initialsOf, overlap,
   type GraphPayload, type Person, type Relationship,
 } from "@/lib/model";
-import { IconExternal, IconPencil, IconTrash, IconX } from "./icons";
+import { IconExternal, IconPencil, IconRefresh, IconTrash, IconX } from "./icons";
 import { useConfirm } from "./ConfirmDialog";
 import {
   EMPTY_PERSON_FORM, PersonFormFields, formToPersonPayload, personToForm,
@@ -46,15 +47,19 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // --- Person view ---
 
-function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDelete }: {
+function PersonView({ person, data, githubId, onClose, onSelectPerson, onEditClick, onDelete, onSyncGithub }: {
   person: Person;
   data: GraphPayload;
+  githubId: string | null;
   onClose: () => void;
   onSelectPerson: (id: string) => void;
   onEditClick: () => void;
   onDelete: () => void;
+  onSyncGithub?: () => Promise<void>;
 }) {
-  const isYou = person.name === "You" && !person.headline && !person.company && !person.location;
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const isYou = person.tags.includes("me");
   const connections = useMemo(() =>
     data.edges
       .filter((e) => e.sourceId === person.id || e.targetId === person.id)
@@ -89,6 +94,37 @@ function PersonView({ person, data, onClose, onSelectPerson, onEditClick, onDele
 
       <div className="mt-3 flex gap-2">
         <button className="btn flex-1" onClick={onEditClick}><IconPencil /> Edit</button>
+        {isYou && !githubId && (
+          <button
+            className="btn flex-1"
+            onClick={() => signIn("github")}
+            title="Link your GitHub account"
+          >
+            Sign in with GitHub
+          </button>
+        )}
+        {isYou && githubId && onSyncGithub && (
+          <button
+            className="btn flex-1"
+            onClick={async () => {
+              setSyncing(true);
+              setSyncError(null);
+              const res = await fetch("/api/github/sync-profile", { method: "POST" });
+              if (res.ok) {
+                await onSyncGithub();
+              } else {
+                const body = await res.json().catch(() => null);
+                setSyncError(body?.error ?? `HTTP ${res.status}`);
+              }
+              setSyncing(false);
+            }}
+            disabled={syncing}
+            title="Sync profile from GitHub"
+          >
+            <IconRefresh className={syncing ? "animate-spin" : ""} /> {syncing ? "Syncing..." : "Sync GitHub"}
+          </button>
+        )}
+        {syncError && <p className="mt-1 text-xs text-red-400">{syncError}</p>}
         {!isYou && (
           <button className="btn text-red-300 hover:bg-red-500/10" onClick={onDelete} title="Delete person"><IconTrash /></button>
         )}
@@ -332,10 +368,11 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
 
 // --- Main panel ---
 
-export default function DetailsPanel({ person, edge, data, onClose, onSelectPerson, onChanged, onClearedSelection, onEditEdgeSelected }: {
+export default function DetailsPanel({ person, edge, data, githubId, onClose, onSelectPerson, onChanged, onClearedSelection, onEditEdgeSelected }: {
   person: Person | null;
   edge: Relationship | null;
   data: GraphPayload;
+  githubId: string | null;
   onClose: () => void;
   onSelectPerson: (id: string) => void;
   onChanged: () => Promise<void>;
@@ -412,6 +449,7 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
         key={person.id}
         person={person}
         data={data}
+        githubId={githubId}
         onClose={onClose}
         onSelectPerson={(id) => onEditEdgeSelected(id)}
         onEditClick={() => { setForm(personToForm(person)); setPersonEditing(true); }}
@@ -421,6 +459,7 @@ export default function DetailsPanel({ person, edge, data, onClose, onSelectPers
           onClearedSelection();
           await onChanged();
         }}
+        onSyncGithub={async () => { await onChanged(); }}
       />
     </div>
   );

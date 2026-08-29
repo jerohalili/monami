@@ -3,7 +3,7 @@
 
 "use client";
 
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GraphPayload, Person, Relationship } from "@/lib/model";
 import { ORIGINS } from "@/lib/model";
@@ -25,6 +25,7 @@ function getInitialTheme(): "dark" | "light" {
 }
 
 export default function NetworkApp() {
+  const { data: session } = useSession();
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const [data, setData] = useState<GraphPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,7 +44,7 @@ export default function NetworkApp() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const res = await fetch("/api/graph");
+      const res = await fetch("/api/graph", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData((await res.json()) as GraphPayload);
     } catch {
@@ -249,6 +250,7 @@ export default function NetworkApp() {
               person={selectedPerson}
               edge={selectedEdge}
               data={data!}
+              githubId={(session?.user as { githubId?: string })?.githubId ?? null}
               onClose={() => { selectPerson(null); setSelectedEdgeId(null); }}
               onSelectPerson={(id) => selectPerson(id)}
               onChanged={async () => { await load(); }}

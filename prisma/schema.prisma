@@ -13,15 +13,17 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String?
-  name         String?
-  image        String?
-  githubId     String?   @unique
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  people       Person[]
+  id               String     @id @default(cuid())
+  email            String     @unique
+  passwordHash     String?
+  name             String?
+  image            String?
+  githubId         String?    @unique
+  githubToken      String?
+  githubTokenExpiry DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  people           Person[]
 }
 
 model Person {

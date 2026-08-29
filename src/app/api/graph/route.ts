@@ -1,5 +1,6 @@
 // GET /api/graph — returns all people and edges for the graph view.
 // Auto-creates a "You" person if the user has no people yet.
+// Ensures the "You" node always has the "me" tag.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -23,11 +24,25 @@ export async function GET() {
           name: "You",
           skills: [],
           interests: [],
-          tags: [],
+          tags: ["me"],
           links: {},
         },
       });
       people = [you];
+    }
+
+    // Ensure the "You" node always has the "me" tag
+    for (const p of people) {
+      if (p.name === "You") {
+        const tags = Array.isArray(p.tags) ? p.tags : [];
+        if (!tags.includes("me")) {
+          const updated = await db.person.update({
+            where: { id: p.id },
+            data: { tags: [...tags, "me"] },
+          });
+          people = people.map((x) => (x.id === p.id ? updated : x));
+        }
+      }
     }
 
     const edges = await db.edge.findMany({
