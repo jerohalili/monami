@@ -36,8 +36,10 @@ export default function NetworkApp() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [showAddEdge, setShowAddEdge] = useState(false);
   const [pendingPlacement, setPendingPlacement] = useState<{ id: string; name: string } | null>(null);
+  const everLoadedRef = useRef(false);
   const [graphReady, setGraphReady] = useState(false);
   const [syncingConnections, setSyncingConnections] = useState(false);
+  const [syncingGithub, setSyncingGithub] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const apiRef = useRef<GraphApi | null>(null);
 
@@ -56,7 +58,7 @@ export default function NetworkApp() {
     try {
       const res = await fetch("/api/github/sync-connections", { method: "POST" });
       const body = await res.json().catch(() => null);
-      if (res.ok) {
+      if (res.ok && body) {
         const parts: string[] = [];
         if (body.created > 0) parts.push(`${body.created} new`);
         if (body.matched > 0) parts.push(`${body.matched} updated`);
@@ -67,14 +69,33 @@ export default function NetworkApp() {
           message: warnings.length > 0 ? `${msg} (${warnings.join("; ")})` : msg,
           type: warnings.length > 0 ? "error" : "success",
         });
-        await load();
       } else {
         setToast({ message: body?.error ?? `Sync failed (HTTP ${res.status})`, type: "error" });
       }
+      await load();
     } catch {
       setToast({ message: "Sync failed — network error", type: "error" });
+      await load();
     }
     setSyncingConnections(false);
+  };
+
+  const handleSyncGithub = async () => {
+    setSyncingGithub(true);
+    try {
+      const res = await fetch("/api/github/sync-profile", { method: "POST" });
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        setToast({ message: "Profile synced from GitHub", type: "success" });
+      } else {
+        setToast({ message: body?.error ?? `Sync failed (HTTP ${res.status})`, type: "error" });
+      }
+      await load();
+    } catch {
+      setToast({ message: "Sync failed — network error", type: "error" });
+      await load();
+    }
+    setSyncingGithub(false);
   };
 
   // --- Data fetching ---
@@ -85,6 +106,7 @@ export default function NetworkApp() {
       const res = await fetch("/api/graph", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData((await res.json()) as GraphPayload);
+      everLoadedRef.current = true;
     } catch {
       setError("Could not load your constellation.");
     } finally {
@@ -136,7 +158,7 @@ export default function NetworkApp() {
 
   // --- Loading / error states ---
 
-  if (loading && !data) {
+  if (!everLoadedRef.current && !data) {
     return (
       <div className="flex h-dvh items-center justify-center" style={{ color: "var(--text-muted)" }}>
         <div className="flex flex-col items-center gap-3">
@@ -181,7 +203,7 @@ export default function NetworkApp() {
         onReady={() => setGraphReady(true)}
       />
 
-      {/* Loading overlay — covers everything while simulation runs */}
+      {/* Loading overlay — covers everything while simulation runs on first load */}
       {!graphReady && data && data.people.length > 0 && (
         <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ color: "var(--text-muted)", background: "var(--bg)" }}>
           <div className="flex flex-col items-center gap-3">
@@ -305,6 +327,8 @@ export default function NetworkApp() {
               onChanged={async () => { await load(); }}
               onClearedSelection={() => selectPerson(null)}
               onEditEdgeSelected={selectPerson}
+              onSyncGithub={handleSyncGithub}
+              syncingGithub={syncingGithub}
             />
           </div>
         </aside>

@@ -47,7 +47,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // --- Person view ---
 
-function PersonView({ person, data, githubId, onClose, onSelectPerson, onEditClick, onDelete, onSyncGithub }: {
+function PersonView({ person, data, githubId, onClose, onSelectPerson, onEditClick, onDelete, onSyncGithub, syncingGithub }: {
   person: Person;
   data: GraphPayload;
   githubId: string | null;
@@ -56,9 +56,8 @@ function PersonView({ person, data, githubId, onClose, onSelectPerson, onEditCli
   onEditClick: () => void;
   onDelete: () => void;
   onSyncGithub?: () => Promise<void>;
+  syncingGithub?: boolean;
 }) {
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
   const isYou = person.tags.includes("me");
   const connections = useMemo(() =>
     data.edges
@@ -106,25 +105,13 @@ function PersonView({ person, data, githubId, onClose, onSelectPerson, onEditCli
         {isYou && githubId && onSyncGithub && (
           <button
             className="btn flex-1"
-            onClick={async () => {
-              setSyncing(true);
-              setSyncError(null);
-              const res = await fetch("/api/github/sync-profile", { method: "POST" });
-              if (res.ok) {
-                await onSyncGithub();
-              } else {
-                const body = await res.json().catch(() => null);
-                setSyncError(body?.error ?? `HTTP ${res.status}`);
-              }
-              setSyncing(false);
-            }}
-            disabled={syncing}
+            onClick={() => onSyncGithub()}
+            disabled={syncingGithub}
             title="Sync profile from GitHub"
           >
-            <IconRefresh className={syncing ? "animate-spin" : ""} /> {syncing ? "Syncing..." : "Sync GitHub"}
+            <IconRefresh className={syncingGithub ? "animate-spin" : ""} /> {syncingGithub ? "Syncing..." : "Sync GitHub"}
           </button>
         )}
-        {syncError && <p className="mt-1 text-xs text-red-400">{syncError}</p>}
         {!isYou && (
           <button className="btn text-red-300 hover:bg-red-500/10" onClick={onDelete} title="Delete person"><IconTrash /></button>
         )}
@@ -368,7 +355,7 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
 
 // --- Main panel ---
 
-export default function DetailsPanel({ person, edge, data, githubId, onClose, onSelectPerson, onChanged, onClearedSelection, onEditEdgeSelected }: {
+export default function DetailsPanel({ person, edge, data, githubId, onClose, onSelectPerson, onChanged, onClearedSelection, onEditEdgeSelected, onSyncGithub, syncingGithub }: {
   person: Person | null;
   edge: Relationship | null;
   data: GraphPayload;
@@ -378,6 +365,8 @@ export default function DetailsPanel({ person, edge, data, githubId, onClose, on
   onChanged: () => Promise<void>;
   onClearedSelection: () => void;
   onEditEdgeSelected: (id: string) => void;
+  onSyncGithub?: () => Promise<void>;
+  syncingGithub?: boolean;
 }) {
   const [personEditing, setPersonEditing] = useState(false);
   const [edgeEditing, setEdgeEditing] = useState(false);
@@ -459,7 +448,8 @@ export default function DetailsPanel({ person, edge, data, githubId, onClose, on
           onClearedSelection();
           await onChanged();
         }}
-        onSyncGithub={async () => { await onChanged(); }}
+        onSyncGithub={onSyncGithub}
+        syncingGithub={syncingGithub}
       />
     </div>
   );

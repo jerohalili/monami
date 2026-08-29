@@ -93,11 +93,11 @@ export default function GraphView({
   const dragNodeIdRef = useRef<string | null>(null);
   const pendingReheatRef = useRef(false);
   const pendingFitRef = useRef(false);
+  const placingRef = useRef(false);
+  const placingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphDataRef = useRef<{ nodes: GNode[]; links: (Relationship & { source: string; target: string })[]; _nodeSig: string; _linkSig: string }>({ nodes: [], links: [], _nodeSig: "", _linkSig: "" });
   const unpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinnedByAddTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didInitialFit = useRef(false);
-  const didMarkEngineReady = useRef(false);
   const prevNodeCountRef = useRef<number | null>(null);
   const initialFitRafRef = useRef<number | null>(null);
 
@@ -200,6 +200,36 @@ export default function GraphView({
     graphDataRef.current = result;
     return result;
   }, [data, pendingPlacement]);
+
+  // Flag a deferred fit when new nodes are added or removed.
+  // On increase, the fit fires on onEngineStop so the simulation has settled.
+  // On decrease, we also fire fit immediately so the view centers before pins
+  // release and nodes drift off-screen.
+  const prevCount = useRef(graphData.nodes.length);
+  const didInitialFit = useRef(false);
+  const didMarkEngineReady = useRef(false);
+  useEffect(() => {
+    if (graphData.nodes.length > prevCount.current) {
+      // Track placement window to block spurious fits from load()'s render.
+      if (pendingPinRef.current) {
+        placingRef.current = true;
+        if (placingTimerRef.current) clearTimeout(placingTimerRef.current);
+        placingTimerRef.current = setTimeout(() => {
+          placingRef.current = false;
+          placingTimerRef.current = null;
+        }, 1500);
+      }
+    }
+    prevCount.current = graphData.nodes.length;
+  }, [graphData]);
+
+  // Clean up placement-blocking timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (placingTimerRef.current) clearTimeout(placingTimerRef.current);
+      if (initialFitRafRef.current !== null) cancelAnimationFrame(initialFitRafRef.current);
+    };
+  }, []);
 
   // Unpin placed node after physics settles.
   // Uses a ref-based timer so it survives re-renders — the cleanup MUST fire
@@ -678,13 +708,6 @@ export default function GraphView({
               // Instant fit — graph appears already zoom-fitted, no animation.
               fgRef.current?.zoomToFit(0, 90);
               onReady?.();
-            } else if (pendingFitRef.current) {
-              pendingFitRef.current = false;
-              if (initialFitRafRef.current !== null) {
-                cancelAnimationFrame(initialFitRafRef.current);
-                initialFitRafRef.current = null;
-              }
-              initialFitRafRef.current = fitGraph(400);
             }
           }}
           onBackgroundClick={(e: MouseEvent) => {
@@ -702,8 +725,7 @@ export default function GraphView({
             onSelectPerson(null);
             onSelectEdge(null);
           }}
-          cooldownTime={1000}
-          cooldownTicks={100}
+          cooldownTime={3000}
           warmupTicks={200}
         />
       )}
