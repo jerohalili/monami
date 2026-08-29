@@ -12,7 +12,7 @@ import DetailsPanel from "./DetailsPanel";
 import AddPersonModal from "./AddPersonModal";
 import AddConnectionModal from "./AddConnectionModal";
 import {
-  IconFit, IconLink, IconLogo, IconPlus,
+  IconFit, IconLink, IconLogo, IconPlus, IconRefresh,
   IconSearch, IconSun, IconMoon, IconX, IconZoomIn, IconZoomOut,
 } from "./icons";
 import { ConfirmProvider } from "./ConfirmDialog";
@@ -37,7 +37,45 @@ export default function NetworkApp() {
   const [showAddEdge, setShowAddEdge] = useState(false);
   const [pendingPlacement, setPendingPlacement] = useState<{ id: string; name: string } | null>(null);
   const [graphReady, setGraphReady] = useState(false);
+  const [syncingConnections, setSyncingConnections] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const apiRef = useRef<GraphApi | null>(null);
+
+  // Auto-dismiss toast after 5 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const githubId = (session?.user as { githubId?: string })?.githubId ?? null;
+
+  const handleSyncConnections = async () => {
+    setSyncingConnections(true);
+    try {
+      const res = await fetch("/api/github/sync-connections", { method: "POST" });
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        const parts: string[] = [];
+        if (body.created > 0) parts.push(`${body.created} new`);
+        if (body.matched > 0) parts.push(`${body.matched} updated`);
+        if (body.skipped > 0) parts.push(`${body.skipped} skipped`);
+        const msg = parts.length > 0 ? `Synced: ${parts.join(", ")}` : "Nothing to sync";
+        const warnings: string[] = body.warnings ?? [];
+        setToast({
+          message: warnings.length > 0 ? `${msg} (${warnings.join("; ")})` : msg,
+          type: warnings.length > 0 ? "error" : "success",
+        });
+        await load();
+      } else {
+        setToast({ message: body?.error ?? `Sync failed (HTTP ${res.status})`, type: "error" });
+      }
+    } catch {
+      setToast({ message: "Sync failed — network error", type: "error" });
+    }
+    setSyncingConnections(false);
+  };
 
   // --- Data fetching ---
 
@@ -204,6 +242,17 @@ export default function NetworkApp() {
             <IconLink />
             <span className="hidden sm:inline">Connect</span>
           </button>
+          {githubId && (
+            <button
+              className="btn"
+              onClick={handleSyncConnections}
+              disabled={syncingConnections}
+              title="Import GitHub followers and following"
+            >
+              <IconRefresh className={syncingConnections ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">Sync</span>
+            </button>
+          )}
           <button className="btn-primary" onClick={() => setShowAddPerson(true)}>
             <IconPlus />
             <span className="hidden sm:inline">Add person</span>
@@ -305,6 +354,19 @@ export default function NetworkApp() {
           onClose={() => setShowAddEdge(false)}
           onCreated={(edge: Relationship) => { setShowAddEdge(false); load().then(() => setSelectedEdgeId(edge.id)); }}
         />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium shadow-lg transition-opacity ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
       )}
     </div>
     </ConfirmProvider>

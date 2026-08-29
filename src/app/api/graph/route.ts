@@ -46,7 +46,12 @@ export async function GET() {
     }
 
     const edges = await db.edge.findMany({
-      where: { source: { userId } },
+      where: {
+        OR: [
+          { source: { userId } },
+          { target: { userId } },
+        ],
+      },
       orderBy: { createdAt: "asc" },
     });
 

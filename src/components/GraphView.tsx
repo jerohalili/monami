@@ -168,7 +168,20 @@ export default function GraphView({
       const key = `${e.sourceId}->${e.targetId}`;
       let existing = linkMapRef.current.get(key);
       if (existing) {
-        Object.assign(existing, { ...e, source: e.sourceId, target: e.targetId });
+        // Only update metadata — do NOT overwrite source/target, which the
+        // force-graph library resolves from string IDs to node objects with
+        // x/y coordinates. Overwriting them breaks line rendering.
+        Object.assign(existing, {
+          id: e.id,
+          origin: e.origin,
+          context: e.context,
+          communities: e.communities,
+          projects: e.projects,
+          strength: e.strength,
+          metAt: e.metAt,
+          sourceId: e.sourceId,
+          targetId: e.targetId,
+        });
       } else {
         existing = { ...e, source: e.sourceId, target: e.targetId };
         linkMapRef.current.set(key, existing);
@@ -180,7 +193,7 @@ export default function GraphView({
     // so preserving identity here is the primary defence against jolts on
     // metadata-only edits.
     const nodeSig = nodes.map((n) => n.id).sort().join(",");
-    const linkSig = links.map((l) => `${lid(l.source)}->${lid(l.target)}`).sort().join(",");
+    const linkSig = links.map((l) => `${lid(l.source)}->${lid(l.target)}:${l.strength}:${l.origin}`).sort().join(",");
     const prev = graphDataRef.current;
     if (nodeSig === prev._nodeSig && linkSig === prev._linkSig) return prev;
     const result = { nodes, links, _nodeSig: nodeSig, _linkSig: linkSig };
