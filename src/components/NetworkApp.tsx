@@ -13,7 +13,7 @@ import AddPersonModal from "./AddPersonModal";
 import AddConnectionModal from "./AddConnectionModal";
 import DiscoverView from "./DiscoverView";
 import {
-  IconFit, IconLink, IconLogo, IconPlus, IconRefresh,
+  IconFit, IconLink, IconLogo, IconMore, IconPlus, IconRefresh,
   IconSearch, IconSettings, IconSun, IconMoon, IconX, IconZoomIn, IconZoomOut,
   IconCompass, IconGitBranch,
 } from "./icons";
@@ -50,6 +50,7 @@ export default function NetworkApp() {
   const apiRef = useRef<GraphApi | null>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [activeTab, setActiveTab] = useState<"network" | "discover">("network");
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
 
   // Auto-dismiss toast after 5 seconds
   useEffect(() => {
@@ -80,6 +81,17 @@ export default function NetworkApp() {
       document.removeEventListener("click", handler);
     };
   }, [showSyncMenu]);
+
+  // Close overflow menu when clicking outside
+  useEffect(() => {
+    if (!showOverflowMenu) return;
+    const handler = () => setShowOverflowMenu(false);
+    const timer = setTimeout(() => document.addEventListener("click", handler), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("click", handler);
+    };
+  }, [showOverflowMenu]);
 
   const githubId = (session?.user as { githubId?: string })?.githubId ?? null;
 
@@ -314,14 +326,14 @@ export default function NetworkApp() {
             Mon<span className="text-violet-400">Ami</span>
           </span>
           {data && (
-            <span className="ml-1 hidden text-xs sm:inline" style={{ color: "var(--text-dim)" }}>
+            <span className="ml-1 hidden text-xs lg:inline" style={{ color: "var(--text-dim)" }}>
               {data.people.length} people · {data.edges.length} connections
             </span>
           )}
         </div>
 
         {/* Search */}
-        <div className="pointer-events-auto relative min-w-0 flex-1 sm:max-w-md">
+        <div className="pointer-events-auto relative min-w-40 flex-1 lg:max-w-md">
           <IconSearch width={15} height={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-dim)" }} />
           <input
             className="field rounded-xl backdrop-blur pl-9"
@@ -355,7 +367,7 @@ export default function NetworkApp() {
             title="Network view"
           >
             <IconGitBranch />
-            <span className="hidden sm:inline">Network</span>
+            <span className="hidden lg:inline">Network</span>
           </button>
           <button
             className={`btn ${activeTab === "discover" ? "bg-violet-500/20 text-violet-400" : ""}`}
@@ -363,7 +375,7 @@ export default function NetworkApp() {
             title="Discover view"
           >
             <IconCompass />
-            <span className="hidden sm:inline">Discover</span>
+            <span className="hidden lg:inline">Discover</span>
           </button>
           <div className="w-px" style={{ background: "var(--border)" }} />
           <button className="btn" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} title="Toggle theme">
@@ -372,11 +384,13 @@ export default function NetworkApp() {
           <div className="w-px" style={{ background: "var(--border)" }} />
           <button className="btn" onClick={() => setShowAddEdge(true)} disabled={!data || data.people.length < 2} title="Add connection">
             <IconLink />
-            <span className="hidden sm:inline">Connect</span>
+            <span className="hidden lg:inline">Connect</span>
           </button>
+
+          {/* Desktop: Sync, Expand inline */}
           {githubId && (
             <>
-              <div className="relative">
+              <div className="relative hidden lg:block">
                 <button
                   className="btn"
                   onClick={() => setShowSyncMenu((v) => !v)}
@@ -384,7 +398,7 @@ export default function NetworkApp() {
                   title="Import GitHub followers and following"
                 >
                   <IconRefresh className={syncingConnections ? "animate-spin" : ""} />
-                  <span className="hidden sm:inline">Sync</span>
+                  <span className="hidden lg:inline">Sync</span>
                 </button>
                 {showSyncMenu && (
                   <div
@@ -414,7 +428,7 @@ export default function NetworkApp() {
                   </div>
                 )}
               </div>
-              <div className="relative">
+              <div className="relative hidden lg:block">
                 <button
                   className="btn"
                   onClick={() => setShowIndirectMenu((v) => !v)}
@@ -422,7 +436,7 @@ export default function NetworkApp() {
                   title="Discover followers/following of your connections"
                 >
                   <IconCompass className={syncingIndirect ? "animate-spin" : ""} />
-                  <span className="hidden sm:inline">Expand</span>
+                  <span className="hidden lg:inline">Expand</span>
                 </button>
                 {showIndirectMenu && (
                   <div
@@ -452,19 +466,88 @@ export default function NetworkApp() {
               </div>
             </>
           )}
+
           <button className="btn-primary" onClick={() => setShowAddPerson(true)}>
             <IconPlus />
-            <span className="hidden sm:inline">Add person</span>
+            <span className="hidden lg:inline">Add person</span>
           </button>
-          <div className="w-px" style={{ background: "var(--border)" }} />
-          <button className="btn" onClick={() => window.location.href = "/settings"} title="Settings">
+
+          {/* Desktop: Settings, Sign out inline */}
+          <div className="w-px hidden lg:block" style={{ background: "var(--border)" }} />
+          <button className="btn hidden lg:inline-flex" onClick={() => window.location.href = "/settings"} title="Settings">
             <IconSettings />
-            <span className="hidden sm:inline">Settings</span>
+            <span className="hidden lg:inline">Settings</span>
           </button>
-          <button className="btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Sign out">
+          <button className="btn hidden lg:inline-flex" onClick={() => signOut({ callbackUrl: "/login" })} title="Sign out">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            <span className="hidden sm:inline">Sign out</span>
+            <span className="hidden lg:inline">Sign out</span>
           </button>
+
+          {/* Mobile: overflow menu button */}
+          <div className="relative lg:hidden">
+            <button
+              className="btn"
+              onClick={() => setShowOverflowMenu((v) => !v)}
+              title="More options"
+            >
+              <IconMore />
+            </button>
+            {showOverflowMenu && (
+              <div
+                className="absolute right-0 top-full z-50 mt-1 w-52 rounded-xl p-2 shadow-xl"
+                style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}
+              >
+                {githubId && (
+                  <>
+                    <button
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition hover:bg-white/5"
+                      style={{ color: "var(--text)" }}
+                      disabled={syncingConnections}
+                      onClick={() => {
+                        setShowOverflowMenu(false);
+                        setShowSyncMenu(true);
+                      }}
+                    >
+                      <IconRefresh className={syncingConnections ? "animate-spin" : ""} />
+                      Sync connections
+                    </button>
+                    <button
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition hover:bg-white/5"
+                      style={{ color: "var(--text)" }}
+                      disabled={syncingIndirect}
+                      onClick={() => {
+                        setShowOverflowMenu(false);
+                        setShowIndirectMenu(true);
+                      }}
+                    >
+                      <IconCompass className={syncingIndirect ? "animate-spin" : ""} />
+                      Expand network
+                    </button>
+                    <div className="my-1 h-px" style={{ background: "var(--border)" }} />
+                  </>
+                )}
+                <button
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition hover:bg-white/5"
+                  style={{ color: "var(--text)" }}
+                  onClick={() => {
+                    setShowOverflowMenu(false);
+                    window.location.href = "/settings";
+                  }}
+                >
+                  <IconSettings />
+                  Settings
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition hover:bg-white/5"
+                  style={{ color: "var(--text)" }}
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -514,9 +597,9 @@ export default function NetworkApp() {
 
       {/* Details sidebar */}
       {(selectedPerson || selectedEdge) && (
-        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md sm:bottom-4 sm:top-4 sm:left-auto sm:right-4 sm:max-h-none sm:w-100 sm:overflow-y-auto sm:rounded-2xl lg:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md lg:bottom-4 lg:top-4 lg:left-auto lg:right-4 lg:max-h-none lg:w-100 lg:overflow-y-auto lg:rounded-2xl xl:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
           {/* Drag handle — visible only on mobile */}
-          <div className="flex justify-center pt-2 sm:hidden">
+          <div className="flex justify-center pt-2 lg:hidden">
             <div className="h-1 w-10 rounded-full" style={{ background: "var(--border-strong)" }} />
           </div>
           <div className="space-y-4 p-4">

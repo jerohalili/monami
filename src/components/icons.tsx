@@ -170,3 +170,13 @@ export function IconSettings(props: P) {
     </svg>
   );
 }
+
+export function IconMore(props: P) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="5" r="1.5" />
+      <circle cx="12" cy="12" r="1.5" />
+      <circle cx="12" cy="19" r="1.5" />
+    </svg>
+  );
+}

@@ -1,3 +1,4 @@
+// GET  /api/account — return account info (hasPassword, githubLinked).
 // PATCH /api/account — update email or password.
 // DELETE /api/account — delete the authenticated user and all associated data.
 
@@ -5,6 +6,26 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/auth-guard";
+
+export async function GET() {
+  try {
+    const userId = await requireUserId();
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { email: true, passwordHash: true, githubId: true },
+    });
+    if (!user) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({
+      email: user.email,
+      hasPassword: !!user.passwordHash,
+      githubLinked: !!user.githubId,
+    });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
 
 export async function PATCH(req: Request) {
   try {

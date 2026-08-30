@@ -2,15 +2,19 @@
 
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { IconLogo, IconSettings, IconTrash } from "@/components/icons";
+import { useEffect, useState } from "react";
+import { IconSettings, IconTrash } from "@/components/icons";
 import { useConfirm } from "@/components/ConfirmDialog";
 
 export default function SettingsPage() {
-  const { data: session, update } = useSession();
+  const { data: session } = useSession();
   const router = useRouter();
   const confirm = useConfirm();
   const [deleting, setDeleting] = useState(false);
+
+  // Account info from API
+  const [hasPassword, setHasPassword] = useState(false);
+  const [githubLinked, setGithubLinked] = useState(false);
 
   // Email form
   const [emailCurrentPw, setEmailCurrentPw] = useState("");
@@ -30,8 +34,17 @@ export default function SettingsPage() {
   const [ghMsg, setGhMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const user = session?.user;
-  const githubLinked = !!(user as { githubId?: string })?.githubId;
-  const hasPassword = !!(user as { hasPassword?: boolean })?.hasPassword;
+
+  // Fetch account info on mount
+  useEffect(() => {
+    fetch("/api/account")
+      .then((r) => r.json())
+      .then((data) => {
+        setHasPassword(data.hasPassword ?? false);
+        setGithubLinked(data.githubLinked ?? false);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleChangeEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +114,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/account/github", { method: "DELETE" });
       if (res.ok) {
         setGhMsg({ type: "success", text: "GitHub unlinked." });
-        await update();
+        setGithubLinked(false);
       } else {
         const body = await res.json().catch(() => null);
         setGhMsg({ type: "error", text: body?.error ?? "Failed to unlink GitHub" });
