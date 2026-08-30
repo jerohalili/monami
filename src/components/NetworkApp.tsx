@@ -42,6 +42,7 @@ export default function NetworkApp() {
   const [syncingGithub, setSyncingGithub] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const apiRef = useRef<GraphApi | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
 
   // Auto-dismiss toast after 5 seconds
   useEffect(() => {
@@ -214,8 +215,8 @@ export default function NetworkApp() {
       )}
 
       {/* Header bar */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-wrap items-center gap-2 p-3">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-2 backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:flex-wrap">
+        <div className="pointer-events-auto flex items-center gap-2 self-start rounded-xl px-3 py-2 backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
           <IconLogo width={20} height={20} className="text-violet-400" />
           <span className="text-sm font-semibold tracking-tight" style={{ color: "var(--text)" }}>
             Mon<span className="text-violet-400">Ami</span>
@@ -227,95 +228,115 @@ export default function NetworkApp() {
           )}
         </div>
 
-        {/* Search */}
-        <div className="pointer-events-auto relative min-w-45 flex-1 sm:max-w-md">
-          <IconSearch width={15} height={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-dim)" }} />
-          <input
-            className="field rounded-xl backdrop-blur pl-9"
-            placeholder="Search skills, interests, names..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setQuery("");
-              if (e.key === "Enter" && matchedIds && matchedIds.size > 0) {
-                selectPerson(data!.people.find((p) => matchedIds.has(p.id))!.id);
-              }
-            }}
-          />
-          {query && (
-            <button onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 hover:opacity-80" style={{ color: "var(--text-dim)" }} aria-label="Clear search">
-              <IconX width={14} height={14} />
-            </button>
-          )}
-          {matchedIds && (
-            <div className="absolute right-10 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-dim)" }}>
-              {matchedIds.size} match{matchedIds.size === 1 ? "" : "es"}
-            </div>
-          )}
-        </div>
+        <div className="flex w-full gap-2 sm:w-auto sm:flex-1 sm:items-center">
+          {/* Search */}
+          <div className="pointer-events-auto relative min-w-0 flex-1 sm:max-w-md">
+            <IconSearch width={15} height={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-dim)" }} />
+            <input
+              className="field rounded-xl backdrop-blur pl-9"
+              placeholder="Search..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setQuery("");
+                if (e.key === "Enter" && matchedIds && matchedIds.size > 0) {
+                  selectPerson(data!.people.find((p) => matchedIds.has(p.id))!.id);
+                }
+              }}
+            />
+            {query && (
+              <button onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 hover:opacity-80" style={{ color: "var(--text-dim)" }} aria-label="Clear search">
+                <IconX width={14} height={14} />
+              </button>
+            )}
+            {matchedIds && (
+              <div className="absolute right-10 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-dim)" }}>
+                {matchedIds.size} match{matchedIds.size === 1 ? "" : "es"}
+              </div>
+            )}
+          </div>
 
-        {/* Actions */}
-        <div className="pointer-events-auto flex gap-1 rounded-xl p-1 backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
-          <button className="btn" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} title="Toggle theme">
-            {theme === "dark" ? <IconSun /> : <IconMoon />}
-          </button>
-          <div className="w-px" style={{ background: "var(--border)" }} />
-          <button className="btn" onClick={() => setShowAddEdge(true)} disabled={!data || data.people.length < 2} title="Add connection">
-            <IconLink />
-            <span className="hidden sm:inline">Connect</span>
-          </button>
-          {githubId && (
-            <button
-              className="btn"
-              onClick={handleSyncConnections}
-              disabled={syncingConnections}
-              title="Import GitHub followers and following"
-            >
-              <IconRefresh className={syncingConnections ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">Sync</span>
+          {/* Actions */}
+          <div className="pointer-events-auto flex shrink-0 gap-1 rounded-xl p-1 backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+            <button className="btn" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} title="Toggle theme">
+              {theme === "dark" ? <IconSun /> : <IconMoon />}
             </button>
-          )}
-          <button className="btn-primary" onClick={() => setShowAddPerson(true)}>
-            <IconPlus />
-            <span className="hidden sm:inline">Add person</span>
-          </button>
-          <div className="w-px" style={{ background: "var(--border)" }} />
-          <button className="btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Sign out">
-            <span className="hidden sm:inline">Sign out</span>
-            <span className="sm:hidden">...</span>
-          </button>
+            <div className="w-px" style={{ background: "var(--border)" }} />
+            <button className="btn" onClick={() => setShowAddEdge(true)} disabled={!data || data.people.length < 2} title="Add connection">
+              <IconLink />
+              <span className="hidden sm:inline">Connect</span>
+            </button>
+            {githubId && (
+              <button
+                className="btn"
+                onClick={handleSyncConnections}
+                disabled={syncingConnections}
+                title="Import GitHub followers and following"
+              >
+                <IconRefresh className={syncingConnections ? "animate-spin" : ""} />
+                <span className="hidden sm:inline">Sync</span>
+              </button>
+            )}
+            <button className="btn-primary" onClick={() => setShowAddPerson(true)}>
+              <IconPlus />
+              <span className="hidden sm:inline">Add person</span>
+            </button>
+            <div className="w-px" style={{ background: "var(--border)" }} />
+            <button className="btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Sign out">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Zoom controls */}
-      <div className="pointer-events-auto absolute bottom-4 right-4 z-30 hidden flex-col gap-1.5 rounded-xl p-1.5 backdrop-blur sm:flex" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+      <div className="pointer-events-auto absolute bottom-4 right-4 z-30 flex flex-col gap-1.5 rounded-xl p-1.5 backdrop-blur sm:bottom-4" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
         <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.zoomIn()} title="Zoom in"><IconZoomIn /></button>
         <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.zoomOut()} title="Zoom out"><IconZoomOut /></button>
         <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.fit()} title="Fit view"><IconFit /></button>
       </div>
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-30 hidden max-w-[80%] flex-wrap gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-xs backdrop-blur md:flex" style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}>
-        {Object.entries(ORIGINS).map(([k, v]) => (
-          <span key={k} className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full" style={{ background: v.color }} />
-            {v.label}
+      {/* Legend — toggleable on mobile, always visible on md+ */}
+      <div className="absolute bottom-4 left-3 z-30 md:left-4">
+        <button
+          className="pointer-events-auto flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs backdrop-blur md:hidden"
+          onClick={() => setShowLegend((v) => !v)}
+          style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}
+          title="Toggle legend"
+        >
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} />
+          Legend
+        </button>
+        <div
+          className={`${showLegend ? "flex" : "hidden"} mt-1 max-w-[80vw] flex-wrap gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-xs backdrop-blur md:mt-0 md:flex`}
+          style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}
+        >
+          {Object.entries(ORIGINS).map(([k, v]) => (
+            <span key={k} className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ background: v.color }} />
+              {v.label}
+            </span>
+          ))}
+          <span className="ml-1 inline-flex items-center gap-1 pl-2" style={{ borderLeft: "1px solid var(--border)" }}>
+            <span className="inline-block h-0 w-3 border-t border-dashed" style={{ borderColor: "var(--text-muted)" }} /> weak
           </span>
-        ))}
-        <span className="ml-1 inline-flex items-center gap-1 pl-2" style={{ borderLeft: "1px solid var(--border)" }}>
-          <span className="inline-block h-0 w-3 border-t border-dashed" style={{ borderColor: "var(--text-muted)" }} /> weak
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-0 w-3 border-t-2" style={{ borderColor: "var(--text-muted)" }} /> normal
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-0 w-3 border-t-[3px]" style={{ borderColor: "var(--text-muted)" }} /> strong
-        </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-0 w-3 border-t-2" style={{ borderColor: "var(--text-muted)" }} /> normal
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-0 w-3 border-t-[3px]" style={{ borderColor: "var(--text-muted)" }} /> strong
+          </span>
+        </div>
       </div>
 
       {/* Details sidebar */}
       {(selectedPerson || selectedEdge) && (
         <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md sm:bottom-4 sm:top-4 sm:left-auto sm:right-4 sm:max-h-none sm:w-100 sm:overflow-y-auto sm:rounded-2xl lg:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+          {/* Drag handle — visible only on mobile */}
+          <div className="flex justify-center pt-2 sm:hidden">
+            <div className="h-1 w-10 rounded-full" style={{ background: "var(--border-strong)" }} />
+          </div>
           <div className="space-y-4 p-4">
             <DetailsPanel
               person={selectedPerson}
@@ -383,7 +404,7 @@ export default function NetworkApp() {
       {/* Toast */}
       {toast && (
         <div
-          className={`fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium shadow-lg transition-opacity ${
+          className={`fixed left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium shadow-lg transition-opacity bottom-20 sm:bottom-4 ${
             toast.type === "success"
               ? "bg-emerald-600 text-white"
               : "bg-red-600 text-white"

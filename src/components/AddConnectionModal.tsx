@@ -190,7 +190,7 @@ export default function AddConnectionModal({
         {/* Edge form — shown once two people selected */}
         {bothSelected && (
           <>
-            <div className="border-t border-white/10 pt-3">
+            <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
               <EdgeFormFields value={form} onChange={setForm} />
             </div>
           </>

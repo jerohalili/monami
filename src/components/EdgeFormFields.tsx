@@ -60,12 +60,12 @@ export function EdgeFormFields({ value, onChange }: {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="label">How you know them</label>
           <select className="field" value={value.origin} onChange={set("origin")}>
             {ORIGIN_KEYS.map((k) => (
-              <option key={k} value={k} className="bg-[#0b101d]">{ORIGINS[k].label}</option>
+              <option key={k} value={k}>{ORIGINS[k].label}</option>
             ))}
           </select>
         </div>
@@ -73,7 +73,7 @@ export function EdgeFormFields({ value, onChange }: {
           <label className="label">Tie strength</label>
           <select className="field" value={value.strength} onChange={set("strength")}>
             {["1", "2", "3"].map((s) => (
-              <option key={s} value={s} className="bg-[#0b101d]">{STRENGTH_LABELS[s]}</option>
+              <option key={s} value={s}>{STRENGTH_LABELS[s]}</option>
             ))}
           </select>
         </div>

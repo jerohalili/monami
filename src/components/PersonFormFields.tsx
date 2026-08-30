@@ -87,7 +87,7 @@ export function PersonFormFields({ value, onChange, isNew }: {
         <label className="label">Name *</label>
         <input className="field" value={value.name} onChange={set("name")} placeholder="Ada Lovelace" autoFocus={isNew} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="label">Headline</label>
           <input className="field" value={value.headline} onChange={set("headline")} placeholder="Backend engineer @ ..." />
@@ -97,7 +97,7 @@ export function PersonFormFields({ value, onChange, isNew }: {
           <input className="field" value={value.company} onChange={set("company")} placeholder="Fathom" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="label">Nickname / handle</label>
           <input className="field" value={value.nickname} onChange={set("nickname")} placeholder="maya.dev" />
@@ -111,7 +111,7 @@ export function PersonFormFields({ value, onChange, isNew }: {
         <label className="label">Avatar URL</label>
         <input className="field" value={value.avatarUrl} onChange={set("avatarUrl")} placeholder="https://..." />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="label">Email</label>
           <input className="field" value={value.email} onChange={set("email")} placeholder="ada@example.com" />

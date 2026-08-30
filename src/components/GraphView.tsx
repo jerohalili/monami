@@ -452,7 +452,7 @@ export default function GraphView({
   const paintPointerArea = (raw: object, color: string, ctx: CanvasRenderingContext2D, _globalScale: number) => {
     const n = raw as GNode;
     if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) return;
-    const r = radiusOf(n) + 4; // small padding for easier targeting
+    const r = radiusOf(n) + 10; // generous padding for touch targets
     ctx.beginPath();
     ctx.arc(n.x!, n.y!, r, 0, Math.PI * 2);
     ctx.fillStyle = color;
@@ -652,11 +652,11 @@ export default function GraphView({
     <div
       ref={wrapRef}
       className="stars absolute inset-0"
+      style={{ touchAction: "none", cursor: hoverNode ? "pointer" : "grab" }}
       onMouseMove={(e) => {
         const rect = wrapRef.current!.getBoundingClientRect();
         setTipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       }}
-      style={{ cursor: hoverNode ? "pointer" : "grab" }}
     >
       {size.w > 0 && (
         <ForceGraph2D
@@ -690,6 +690,7 @@ export default function GraphView({
             }
           }}
           enablePanInteraction={(e: MouseEvent) => !isDraggingRef.current && !pendingPlacement}
+          enableNodeDrag={true}
           onLinkClick={(l: object) => onSelectEdge((l as Relationship).id)}
           onLinkHover={(l: object | null) => setHoverLink(l ? (l as Relationship) : null)}
           onEngineTick={() => {
