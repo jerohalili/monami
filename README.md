@@ -12,13 +12,13 @@ Interactive network graph that turns your GitHub connections into a visual map o
 
 ## Stack
 
-Next.js (App Router) · React · TypeScript · Tailwind CSS v4 · Prisma + SQLite · react-force-graph-2d
+Next.js (App Router) · React · TypeScript · Tailwind CSS v4 · Prisma + PostgreSQL · react-force-graph-2d
 
 ## Getting started
 
 ```bash
 npm install
-npm run setup   # creates prisma/dev.db and loads the sample network
+npm run setup   # creates tables in your PostgreSQL database
 npm run dev
 ```
 

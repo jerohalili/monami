@@ -14,7 +14,7 @@ import AddConnectionModal from "./AddConnectionModal";
 import DiscoverView from "./DiscoverView";
 import {
   IconFit, IconLink, IconLogo, IconPlus, IconRefresh,
-  IconSearch, IconSun, IconMoon, IconX, IconZoomIn, IconZoomOut,
+  IconSearch, IconSettings, IconSun, IconMoon, IconX, IconZoomIn, IconZoomOut,
   IconCompass, IconGitBranch,
 } from "./icons";
 import { ConfirmProvider } from "./ConfirmDialog";
@@ -172,7 +172,14 @@ export default function NetworkApp() {
     try {
       setError(null);
       const res = await fetch("/api/graph", { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        if (body?.error === "Session expired") {
+          setError("Session expired. Please sign in again.");
+          return;
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
       setData((await res.json()) as GraphPayload);
       everLoadedRef.current = true;
     } catch {
@@ -226,23 +233,34 @@ export default function NetworkApp() {
 
   // --- Loading / error states ---
 
+  if (error && !data) {
+    const isSessionExpired = error.includes("Session expired");
+    return (
+      <div className="flex h-dvh items-center justify-center p-6 text-center" style={{ color: "var(--text)" }}>
+        <div className="space-y-4">
+          <div className="flex flex-col items-center gap-2">
+            <IconLogo width={32} height={32} className="text-violet-400" />
+            <p className="text-sm">{error}</p>
+          </div>
+          <div className="flex gap-2 justify-center">
+            {!isSessionExpired && (
+              <button className="btn-primary" onClick={() => { setLoading(true); load(); }}>Retry</button>
+            )}
+            <button className="btn" onClick={() => signOut({ callbackUrl: "/login" })}>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!everLoadedRef.current && !data) {
     return (
       <div className="flex h-dvh items-center justify-center" style={{ color: "var(--text-muted)" }}>
         <div className="flex flex-col items-center gap-3">
           <IconLogo width={36} height={36} className="animate-pulse text-violet-400" />
           <p className="text-sm">Charting your constellation...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <div className="flex h-dvh items-center justify-center p-6 text-center" style={{ color: "var(--text)" }}>
-        <div className="space-y-3">
-          <p className="text-sm">{error}</p>
-          <button className="btn-primary" onClick={() => { setLoading(true); load(); }}>Retry</button>
         </div>
       </div>
     );
@@ -439,6 +457,10 @@ export default function NetworkApp() {
             <span className="hidden sm:inline">Add person</span>
           </button>
           <div className="w-px" style={{ background: "var(--border)" }} />
+          <button className="btn" onClick={() => window.location.href = "/settings"} title="Settings">
+            <IconSettings />
+            <span className="hidden sm:inline">Settings</span>
+          </button>
           <button className="btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Sign out">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             <span className="hidden sm:inline">Sign out</span>

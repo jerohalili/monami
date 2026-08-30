@@ -6,7 +6,7 @@ An interactive constellation graph of your professional network: people, connect
 
 - **Next.js 15** (App Router) + React 19 + TypeScript
 - **Tailwind CSS v4** — dark space/constellation theme
-- **Prisma + SQLite** — single-file database (`prisma/dev.db`)
+- **Prisma + PostgreSQL** — cloud database (Neon)
 - **react-force-graph-2d** — force-directed canvas graph
 - **NextAuth v5 (beta)** — GitHub OAuth + Credentials providers
 
@@ -125,7 +125,7 @@ npm run build        # production build
 ## Environment
 
 ```
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/dbname?sslmode=require"
 AUTH_SECRET="<nextauth secret>"
 GITHUB_ID="<github oauth client id>"
 GITHUB_SECRET="<github oauth client secret>"

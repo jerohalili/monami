@@ -11,6 +11,12 @@ export async function GET() {
   try {
     const userId = await requireUserId();
 
+    // Verify user exists in the database (handles stale sessions)
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return NextResponse.json({ error: "Session expired" }, { status: 401 });
+    }
+
     let people = await db.person.findMany({
       where: { userId },
       orderBy: { createdAt: "asc" },

@@ -115,6 +115,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user && token.githubId) {
         (session.user as { githubId?: string }).githubId = token.githubId as string;
       }
+      // Expose whether the user has a password set (for settings UI)
+      if (session.user && token.id) {
+        const dbUser = await db.user.findUnique({
+          where: { id: token.id as string },
+          select: { passwordHash: true },
+        });
+        (session.user as { hasPassword?: boolean }).hasPassword = !!dbUser?.passwordHash;
+      }
       return session;
     },
   },

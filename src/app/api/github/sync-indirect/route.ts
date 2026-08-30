@@ -71,9 +71,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Clean up previous indirect nodes first (raw SQL for SQLite JSON array matching)
+    // Clean up previous indirect nodes first (raw SQL for JSON array matching)
     const staleIds: { id: string }[] = await db.$queryRaw`
-      SELECT id FROM Person WHERE tags LIKE '%github_indirect%'
+      SELECT id FROM "Person" WHERE tags::text LIKE '%github_indirect%'
     `;
     if (staleIds.length > 0) {
       const ids = staleIds.map((p) => p.id);
