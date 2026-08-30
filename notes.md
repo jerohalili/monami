@@ -51,14 +51,15 @@ src/
     demo.ts            — 11 demo people + 13 edges + insertDemoData()
     auth.ts            — NextAuth config (GitHub + Credentials providers, JWT session)
     auth-guard.ts      — requireUserId() helper (reads session)
-    github.ts          — GitHub API utilities (token management, profile/followers/following fetchers)
+    github.ts          — GitHub API utilities (token management, profile/followers/following/repos fetchers)
     graph-types.ts     — graph-related type definitions
     graph-utils.ts     — graph utility functions
 
   components/
-    NetworkApp.tsx     — main app shell (data loading, selection, modals)
+    NetworkApp.tsx     — main app shell (data loading, selection, modals, tab system)
     GraphView.tsx      — force-directed graph canvas (node/link painting)
     DetailsPanel.tsx   — right sidebar (person view / edge editor)
+    DiscoverView.tsx   — Discover tab (repos, recommendations)
     AddPersonModal.tsx — create person form
     AddConnectionModal.tsx — create edge form
     PersonFormFields.tsx — shared person form fields
@@ -86,6 +87,9 @@ src/
       seed/route.ts               — POST seed demo data
       github/
         sync-profile/route.ts     — POST sync GitHub profile to "You" node
+        sync-connections/route.ts — POST sync GitHub followers/following
+        repos/route.ts            — GET user's GitHub repos
+        recommendations/route.ts  — GET people and repo recommendations
 ```
 
 ## API Routes
@@ -104,6 +108,9 @@ src/
 | DELETE | `/api/edges/[id]`              | Delete edge                        |
 | POST   | `/api/seed`                    | Seed demo data (if empty)          |
 | POST   | `/api/github/sync-profile`     | Sync GitHub profile to "You" node  |
+| POST   | `/api/github/sync-connections` | Sync GitHub followers/following    |
+| GET    | `/api/github/repos`            | Get user's GitHub repos            |
+| GET    | `/api/github/recommendations`  | Get people and repo recommendations |
 
 ## Development
 
@@ -148,7 +155,7 @@ GitHub OAuth integration and profile sync. The "You" node can now be populated f
 
 ---
 
-## Phase 2 — GitHub Connections Sync
+## Phase 2 — Done
 
 Import GitHub followers and following as graph nodes with edges to the "You" node.
 
@@ -195,12 +202,20 @@ Import GitHub followers and following as graph nodes with edges to the "You" nod
 
 ---
 
-## Phase 3 — Discover Tab
+## Phase 3 — Done
 
 A "Discover" tab alongside the graph view for exploring repos, orgs, and getting recommendations.
 
+### What was built
+- **Tab system**: Added "Network" and "Discover" tabs to the header bar with `activeTab` state
+- **DiscoverView component**: New scrollable card-based layout with 3 sections (repos, people recommendations, repo recommendations)
+- **GitHub API helpers**: Added `fetchGitHubRepos()`, `fetchGitHubOrgs()`, `fetchGitHubStarredRepos()`, `fetchGitHubRepoContributors()` to `github.ts`
+- **API endpoints**: Created `GET /api/github/repos`, `GET /api/github/recommendations`
+- **Icons**: Added `IconCompass`, `IconStar`, `IconBuilding`, `IconGitBranch` to icons.tsx
+- **Conditional rendering**: Graph-specific elements (zoom controls, legend, empty state) only show on Network tab
+
 ### Goals
-- Show the user's GitHub repos and orgs
+- Show the user's GitHub repos
 - Recommend people to connect with based on shared activity
 - Recommend repos to check out based on connections' stars
 
@@ -220,23 +235,13 @@ A "Discover" tab alongside the graph view for exploring repos, orgs, and getting
 - Link to GitHub repo
 - Sort by: stars (default), recently updated, name
 
-### Section 2: My Orgs
-
-**API: `GET /api/github/orgs`**
-- Fetches user's orgs via GitHub API `/user/orgs`
-- Returns: `{ orgs: GitHubOrg[] }` — already typed in `github.ts`
-
-**UI:**
-- Card grid showing each org with: name, avatar, description
-- Link to GitHub org
-
-### Section 3: People Recommender
+### Section 2: People Recommender
 
 **API: `GET /api/github/recommendations?type=people`**
 - Algorithm:
-  1. Find GitHub users who appear in the same repos/orgs as the user but are NOT yet in the network
+  1. Find GitHub users who appear in the same repos as the user but are NOT yet in the network
   2. Look at followers/following of the user's existing connections
-  3. Score by: number of shared repos/orgs, mutual connections
+  3. Score by: number of shared repos, mutual connections
 - Return top N suggestions with: `login`, `avatar_url`, `reason` (e.g. "Contributor to 3 shared repos", "Followed by 2 connections")
 
 **UI:**
@@ -244,12 +249,12 @@ A "Discover" tab alongside the graph view for exploring repos, orgs, and getting
 - "Add to network" button → creates Person node + optional Edge
 - "Ignore" button to dismiss
 
-### Section 4: Repo Recommender
+### Section 3: Repo Recommender
 
 **API: `GET /api/github/recommendations?type=repos`**
 - Algorithm:
   1. Find repos starred by the user's connections but not by the user
-  2. Find repos from shared orgs that the user hasn't starred
+  2. Find repos that the user hasn't starred
   3. Score by: number of connections who starred it, total stars
 
 **UI:**
@@ -258,9 +263,8 @@ A "Discover" tab alongside the graph view for exploring repos, orgs, and getting
 - "Add to profile" link button
 
 ### Files to modify/create
-- `src/lib/github.ts` — add `fetchGitHubRepos()`, `fetchGitHubOrgs()`, `fetchGitHubStargazers()` helpers
+- `src/lib/github.ts` — add `fetchGitHubRepos()`, `fetchGitHubStarredRepos()`, `fetchGitHubRepoContributors()` helpers
 - `src/app/api/github/repos/route.ts` — **new** endpoint
-- `src/app/api/github/orgs/route.ts` — **new** endpoint
 - `src/app/api/github/recommendations/route.ts` — **new** endpoint
 - `src/components/DiscoverView.tsx` — **new** component for the Discover tab content
 - `src/components/NetworkApp.tsx` — add tab state, render DiscoverView when "Discover" tab active
@@ -269,10 +273,9 @@ A "Discover" tab alongside the graph view for exploring repos, orgs, and getting
 ### Data flow
 ```
 NetworkApp (tab state)
-  ├─ [Graph tab] → GraphView + DetailsPanel
+  ├─ [Network tab] → GraphView + DetailsPanel
   └─ [Discover tab] → DiscoverView + DetailsPanel
        ├─ ReposSection → GET /api/github/repos
-       ├─ OrgsSection → GET /api/github/orgs
        ├─ PeopleRecommendations → GET /api/github/recommendations?type=people
        └─ RepoRecommendations → GET /api/github/recommendations?type=repos
 ```

@@ -40,14 +40,6 @@ export interface GitHubRepo {
   updated_at: string;
 }
 
-export interface GitHubOrg {
-  login: string;
-  id: number;
-  avatar_url: string;
-  description: string | null;
-  name: string | null;
-}
-
 // --- Token management ---
 
 export async function getGitHubToken(userId: string): Promise<string | null> {
@@ -101,6 +93,22 @@ export async function fetchGitHubFollowers(token: string): Promise<GitHubUser[]>
 
 export async function fetchGitHubFollowing(token: string): Promise<GitHubUser[]> {
   return fetchAllPaginated<GitHubUser>(token, "/user/following");
+}
+
+export async function fetchGitHubRepos(token: string): Promise<GitHubRepo[]> {
+  return fetchAllPaginated<GitHubRepo>(token, "/user/repos?sort=updated&direction=desc");
+}
+
+export async function fetchGitHubStarredRepos(token: string): Promise<GitHubRepo[]> {
+  return fetchAllPaginated<GitHubRepo>(token, "/user/starred?sort=created&direction=desc");
+}
+
+export async function fetchGitHubRepoContributors(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<GitHubUser[]> {
+  return fetchAllPaginated<GitHubUser>(token, `/repos/${owner}/${repo}/contributors`);
 }
 
 // Paginate through all results (up to 10 pages to avoid excessive API calls)

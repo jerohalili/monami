@@ -6,7 +6,13 @@ import { db } from "./db";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
-    GitHub,
+    GitHub({
+      authorization: {
+        params: {
+          scope: "read:user user:email",
+        },
+      },
+    }),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
