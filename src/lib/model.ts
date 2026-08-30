@@ -3,6 +3,7 @@
 export const ORIGINS = {
   in_person: { label: "Met in person", color: "#f59e0b" },
   github: { label: "GitHub", color: "#a78bfa" },
+  github_indirect: { label: "GitHub (indirect)", color: "#7c3aed" },
   school: { label: "School", color: "#38bdf8" },
   work: { label: "Work", color: "#34d399" },
   introduction: { label: "Introduction", color: "#f472b6" },

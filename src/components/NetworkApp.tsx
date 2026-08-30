@@ -42,6 +42,10 @@ export default function NetworkApp() {
   const [graphReady, setGraphReady] = useState(false);
   const [syncingConnections, setSyncingConnections] = useState(false);
   const [syncingGithub, setSyncingGithub] = useState(false);
+  const [syncingIndirect, setSyncingIndirect] = useState(false);
+  const [showSyncMenu, setShowSyncMenu] = useState(false);
+  const [showIndirectMenu, setShowIndirectMenu] = useState(false);
+  const [indirectMax, setIndirectMax] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const apiRef = useRef<GraphApi | null>(null);
   const [showLegend, setShowLegend] = useState(false);
@@ -55,17 +59,44 @@ export default function NetworkApp() {
     }
   }, [toast]);
 
+  // Close indirect menu when clicking outside
+  useEffect(() => {
+    if (!showIndirectMenu) return;
+    const handler = () => setShowIndirectMenu(false);
+    const timer = setTimeout(() => document.addEventListener("click", handler), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("click", handler);
+    };
+  }, [showIndirectMenu]);
+
+  // Close sync menu when clicking outside
+  useEffect(() => {
+    if (!showSyncMenu) return;
+    const handler = () => setShowSyncMenu(false);
+    const timer = setTimeout(() => document.addEventListener("click", handler), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("click", handler);
+    };
+  }, [showSyncMenu]);
+
   const githubId = (session?.user as { githubId?: string })?.githubId ?? null;
 
-  const handleSyncConnections = async () => {
+  const handleSyncConnections = async (filter: "all" | "following" | "mutual" = "all") => {
     setSyncingConnections(true);
     try {
-      const res = await fetch("/api/github/sync-connections", { method: "POST" });
+      const res = await fetch("/api/github/sync-connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filter }),
+      });
       const body = await res.json().catch(() => null);
       if (res.ok && body) {
         const parts: string[] = [];
         if (body.created > 0) parts.push(`${body.created} new`);
         if (body.matched > 0) parts.push(`${body.matched} updated`);
+        if (body.crossEdgesCreated > 0) parts.push(`${body.crossEdgesCreated} cross-connections`);
         if (body.skipped > 0) parts.push(`${body.skipped} skipped`);
         const msg = parts.length > 0 ? `Synced: ${parts.join(", ")}` : "Nothing to sync";
         const warnings: string[] = body.warnings ?? [];
@@ -100,6 +131,39 @@ export default function NetworkApp() {
       await load();
     }
     setSyncingGithub(false);
+  };
+
+  const handleSyncIndirect = async (maxConnections: number) => {
+    setSyncingIndirect(true);
+    try {
+      const res = await fetch("/api/github/sync-indirect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxConnections }),
+      });
+      const body = await res.json().catch(() => null);
+      if (res.ok && body) {
+        const parts: string[] = [];
+        if (body.cleanedUp > 0) parts.push(`${body.cleanedUp} old removed`);
+        if (body.created > 0) parts.push(`${body.created} discovered`);
+        if (body.skipped > 0) parts.push(`${body.skipped} skipped`);
+        const msg = parts.length > 0
+          ? `Explored ${body.connectionsExplored} connections — ${parts.join(", ")}`
+          : "No new indirect connections found";
+        const warnings: string[] = body.warnings ?? [];
+        setToast({
+          message: warnings.length > 0 ? `${msg} (${warnings.join("; ")})` : msg,
+          type: warnings.length > 0 ? "error" : "success",
+        });
+      } else {
+        setToast({ message: body?.error ?? `Discover failed (HTTP ${res.status})`, type: "error" });
+      }
+      await load();
+    } catch {
+      setToast({ message: "Discover failed — network error", type: "error" });
+      await load();
+    }
+    setSyncingIndirect(false);
   };
 
   // --- Data fetching ---
@@ -293,15 +357,82 @@ export default function NetworkApp() {
             <span className="hidden sm:inline">Connect</span>
           </button>
           {githubId && (
-            <button
-              className="btn"
-              onClick={handleSyncConnections}
-              disabled={syncingConnections}
-              title="Import GitHub followers and following"
-            >
-              <IconRefresh className={syncingConnections ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">Sync</span>
-            </button>
+            <>
+              <div className="relative">
+                <button
+                  className="btn"
+                  onClick={() => setShowSyncMenu((v) => !v)}
+                  disabled={syncingConnections}
+                  title="Import GitHub followers and following"
+                >
+                  <IconRefresh className={syncingConnections ? "animate-spin" : ""} />
+                  <span className="hidden sm:inline">Sync</span>
+                </button>
+                {showSyncMenu && (
+                  <div
+                    className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl p-2 shadow-xl"
+                    style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}
+                  >
+                    <div className="px-2 py-1 text-xs font-medium" style={{ color: "var(--text-dim)" }}>
+                      Sync filter
+                    </div>
+                    {([
+                      { value: "all" as const, label: "All followers & following" },
+                      { value: "following" as const, label: "Following only" },
+                      { value: "mutual" as const, label: "Mutual only" },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition hover:bg-white/5"
+                        style={{ color: "var(--text)" }}
+                        onClick={() => {
+                          setShowSyncMenu(false);
+                          handleSyncConnections(opt.value);
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="relative">
+                <button
+                  className="btn"
+                  onClick={() => setShowIndirectMenu((v) => !v)}
+                  disabled={syncingIndirect}
+                  title="Discover followers/following of your connections"
+                >
+                  <IconCompass className={syncingIndirect ? "animate-spin" : ""} />
+                  <span className="hidden sm:inline">Expand</span>
+                </button>
+                {showIndirectMenu && (
+                  <div
+                    className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl p-2 shadow-xl"
+                    style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}
+                  >
+                    <div className="px-2 py-1 text-xs font-medium" style={{ color: "var(--text-dim)" }}>
+                      Max connections to explore
+                    </div>
+                    {[0, 5, 10, 20, 50].map((n) => (
+                      <button
+                        key={n}
+                        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition hover:bg-white/5"
+                        style={{ color: "var(--text)" }}
+                        onClick={() => {
+                          setIndirectMax(n);
+                          setShowIndirectMenu(false);
+                          handleSyncIndirect(n);
+                        }}
+                      >
+                        <span className={`inline-block h-2 w-2 rounded-full ${indirectMax === n ? "bg-violet-400" : "bg-transparent"}`} style={{ border: "1px solid var(--border)" }} />
+                        {n === 0 ? "Remove expanded" : `${n} connections`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
           <button className="btn-primary" onClick={() => setShowAddPerson(true)}>
             <IconPlus />

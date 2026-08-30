@@ -1,4 +1,5 @@
 // POST /api/github/sync-connections — import GitHub followers and following as graph nodes.
+// Optional body: { filter: "all" | "following" | "mutual" }
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -8,8 +9,12 @@ import {
   fetchGitHubProfile,
   fetchGitHubFollowers,
   fetchGitHubFollowing,
+  fetchUserFollowers,
+  getRateLimitRemaining,
   type GitHubUser,
 } from "@/lib/github";
+
+const MIN_RATE_LIMIT = 500;
 
 async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
   try {
@@ -25,9 +30,20 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> 
   }
 }
 
-export async function POST() {
+type SyncFilter = "all" | "following" | "mutual";
+
+export async function POST(req: Request) {
   try {
     const userId = await requireUserId();
+
+    // Parse filter from body
+    let filter: SyncFilter = "all";
+    try {
+      const body = await req.json().catch(() => null);
+      if (body?.filter && ["all", "following", "mutual"].includes(body.filter)) {
+        filter = body.filter;
+      }
+    } catch { /* GET or invalid JSON — use default */ }
 
     const token = await getGitHubToken(userId);
     if (!token) {
@@ -48,7 +64,6 @@ export async function POST() {
           { status: 401 },
         );
       }
-      // Other errors (rate limit, network) — continue, will be caught below
     }
 
     // Fetch following and followers with retry, using allSettled for partial success
@@ -85,6 +100,17 @@ export async function POST() {
     const allUsers = new Map<string, GitHubUser>();
     for (const u of [...following, ...followers]) {
       if (!allUsers.has(u.login)) allUsers.set(u.login, u);
+    }
+
+    // Apply filter
+    if (filter === "following") {
+      for (const login of allUsers.keys()) {
+        if (!followingLogins.has(login)) allUsers.delete(login);
+      }
+    } else if (filter === "mutual") {
+      for (const login of allUsers.keys()) {
+        if (!(followingLogins.has(login) && followerLogins.has(login))) allUsers.delete(login);
+      }
     }
 
     // Find the user's "You" person node
@@ -225,7 +251,95 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({ created, matched, skipped, warnings });
+    // --- Cross-edges: connect imported people who follow each other ---
+    let crossEdgesCreated = 0;
+    const importedLogins = [...allUsers.keys()];
+    const apiCallsUsed = { count: 0 };
+
+    // Check rate limit before starting cross-edge phase
+    const rl = await getRateLimitRemaining(token);
+    if (rl.remaining < MIN_RATE_LIMIT) {
+      warnings.push("Skipped cross-edges: rate limit too low");
+    } else {
+      // Re-fetch people list after creation to get updated data
+      const updatedPeople = await db.person.findMany({ where: { userId } });
+      const updatedByLogin = new Map<string, (typeof updatedPeople)[0]>();
+      for (const p of updatedPeople) {
+        if (p.githubLogin) updatedByLogin.set(p.githubLogin, p);
+      }
+
+      for (const login of importedLogins) {
+        // Check rate limit every 5 people
+        if (apiCallsUsed.count > 0 && apiCallsUsed.count % 5 === 0) {
+          const r = await getRateLimitRemaining(token);
+          if (r.remaining < MIN_RATE_LIMIT) {
+            warnings.push("Rate limit low — stopped cross-edges early");
+            break;
+          }
+        }
+
+        const personA = updatedByLogin.get(login);
+        if (!personA) continue;
+
+        // Fetch this person's followers (1 page)
+        let personFollowers: GitHubUser[];
+        try {
+          personFollowers = await fetchWithRetry(() => fetchUserFollowers(token, login, 1));
+          apiCallsUsed.count++;
+        } catch {
+          continue;
+        }
+
+        // Check if any of their followers are also in our graph
+        for (const follower of personFollowers) {
+          const personB = updatedByLogin.get(follower.login);
+          if (!personB || personB.id === personA.id) continue;
+
+          // Skip if edge already exists (either direction)
+          const existingEdge = await db.edge.findUnique({
+            where: { sourceId_targetId: { sourceId: personA.id, targetId: personB.id } },
+          }).catch(() => null);
+          const reverseEdge = await db.edge.findUnique({
+            where: { sourceId_targetId: { sourceId: personB.id, targetId: personA.id } },
+          }).catch(() => null);
+
+          if (existingEdge || reverseEdge) continue;
+
+          // Check if it's mutual (does B also follow A?)
+          let isMutual = false;
+          try {
+            const bFollowsA = await fetch(`https://api.github.com/users/${follower.login}/following/${login}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+              },
+            });
+            apiCallsUsed.count++;
+            isMutual = bFollowsA.status === 200;
+          } catch { /* assume not mutual */ }
+
+          try {
+            await db.edge.create({
+              data: {
+                sourceId: personA.id,
+                targetId: personB.id,
+                origin: "github",
+                strength: isMutual ? 2 : 1,
+                context: isMutual
+                  ? `Mutual follow on GitHub`
+                  : `${personA.name} follows ${personB.name} on GitHub`,
+                communities: [],
+                projects: [],
+              },
+            });
+            crossEdgesCreated++;
+          } catch { /* ignore duplicate or constraint errors */ }
+        }
+      }
+    }
+
+    return NextResponse.json({ created, matched, skipped, crossEdgesCreated, warnings });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });

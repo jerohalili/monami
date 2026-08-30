@@ -103,6 +103,65 @@ export async function fetchGitHubStarredRepos(token: string): Promise<GitHubRepo
   return fetchAllPaginated<GitHubRepo>(token, "/user/starred?sort=created&direction=desc");
 }
 
+// --- Per-user followers/following (for indirect discovery) ---
+
+export async function fetchUserFollowers(
+  token: string,
+  username: string,
+  maxPages = 3,
+): Promise<GitHubUser[]> {
+  return fetchPaginated<GitHubUser>(token, `/users/${username}/followers`, maxPages);
+}
+
+export async function fetchUserFollowing(
+  token: string,
+  username: string,
+  maxPages = 3,
+): Promise<GitHubUser[]> {
+  return fetchPaginated<GitHubUser>(token, `/users/${username}/following`, maxPages);
+}
+
+export interface RateLimitInfo {
+  remaining: number;
+  limit: number;
+  reset: number;
+}
+
+export async function getRateLimitRemaining(token: string): Promise<RateLimitInfo> {
+  const res = await fetch(`${GITHUB_API}/rate_limit`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  if (!res.ok) {
+    return { remaining: 5000, limit: 5000, reset: Date.now() / 1000 + 3600 };
+  }
+  const data = (await res.json()) as { resources: { core: { remaining: number; limit: number; reset: number } } };
+  return data.resources.core;
+}
+
+// Paginate with a configurable max page count
+async function fetchPaginated<T>(token: string, path: string, maxPages: number): Promise<T[]> {
+  const results: T[] = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (page <= maxPages) {
+    const separator = path.includes("?") ? "&" : "?";
+    const items = await githubFetch<T[]>(
+      token,
+      `${path}${separator}per_page=${perPage}&page=${page}`,
+    );
+    results.push(...items);
+    if (items.length < perPage) break;
+    page++;
+  }
+
+  return results;
+}
+
 export async function fetchGitHubRepoContributors(
   token: string,
   owner: string,
