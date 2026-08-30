@@ -25,6 +25,13 @@ function toRecord(value: unknown): Record<string, string> {
 
 // --- Public input helpers (used by API route handlers) ---
 
+/** Trim a string or return null if not a non-empty string. */
+export function optionalString(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t ? t : null;
+}
+
 /** Parse a comma-separated string or array into a clean string[] */
 export function toStringArrayInput(value: unknown): string[] {
   if (Array.isArray(value)) return toStringArray(value);

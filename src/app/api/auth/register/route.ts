@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-
-function optionalString(v: unknown): string | null {
-  if (typeof v !== "string") return null;
-  const t = v.trim();
-  return t ? t : null;
-}
+import { optionalString } from "@/lib/dto";
 
 export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null);

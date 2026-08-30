@@ -9,7 +9,6 @@ import {
   fetchGitHubStarredRepos,
   fetchGitHubRepoContributors,
 } from "@/lib/github";
-import { personDTO } from "@/lib/dto";
 
 interface RecommendedPerson {
   login: string;

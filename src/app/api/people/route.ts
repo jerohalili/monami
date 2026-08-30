@@ -3,14 +3,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { personDTO, toLinksInput, toStringArrayInput } from "@/lib/dto";
+import { optionalString, personDTO, toLinksInput, toStringArrayInput } from "@/lib/dto";
 import { requireUserId } from "@/lib/auth-guard";
-
-function optionalString(v: unknown): string | null {
-  if (typeof v !== "string") return null;
-  const t = v.trim();
-  return t ? t : null;
-}
 
 export async function GET() {
   try {

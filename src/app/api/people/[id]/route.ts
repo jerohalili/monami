@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { personDTO, toLinksInput, toStringArrayInput } from "@/lib/dto";
+import { optionalString, personDTO, toLinksInput, toStringArrayInput } from "@/lib/dto";
 import { requireUserId } from "@/lib/auth-guard";
 
 type Params = { params: Promise<{ id: string }> };
@@ -14,12 +14,6 @@ const OPTIONAL_STRINGS = [
   "nickname", "avatarUrl", "headline", "company",
   "location", "email", "notes", "githubLogin",
 ] as const;
-
-function optionalString(v: unknown): string | null {
-  if (typeof v !== "string") return null;
-  const t = v.trim();
-  return t ? t : null;
-}
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {

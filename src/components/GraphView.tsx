@@ -9,7 +9,6 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import { forceX, forceY } from "d3-force-3d";
 import {
   ORIGINS,
-  colorForName,
   hexToRgba,
   initialsOf,
   nodeColor,
