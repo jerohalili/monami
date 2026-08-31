@@ -26,6 +26,17 @@ function cubicInOut(t: number): number {
     : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
+// Gentle reheat: sets alpha to 0.15 instead of 1.0 so nodes drift smoothly
+// instead of teleporting. Falls back to full reheat if internals are unavailable.
+function gentleReheat(g: ForceGraphMethods) {
+  const sim = (g as any)?.forceGraph?.state?.forceLayout;
+  if (sim) {
+    sim.alpha(0.15).restart();
+  } else {
+    g.d3ReheatSimulation();
+  }
+}
+
 // --- Types ---
 
 export interface GraphApi {
@@ -202,6 +213,29 @@ export default function GraphView({
     const linkSig = links.map((l) => `${lid(l.source)}->${lid(l.target)}`).sort().join(",");
     const prev = graphDataRef.current;
     if (nodeSig === prev._nodeSig && linkSig === prev._linkSig) return prev;
+    // Link-only change (edge added/removed, no node changes):
+    // Mutate in-place and return same reference so react-force-graph
+    // doesn't detect a prop change and doesn't trigger its internal alpha(1) reheat.
+    if (nodeSig === prev._nodeSig) {
+      prev.links = links;
+      prev._linkSig = linkSig;
+      // Resolve new links' string source/target to node objects.
+      // Normally the library's update() → linkForce.links() does this,
+      // but we skip update() to avoid reheat. Unresolved strings cause
+      // paintCustomLink to bail out (source.x is undefined).
+      const nodeById = new Map(nodes.map(n => [n.id, n]));
+      for (const l of links) {
+        if (typeof l.source === "string") {
+          const resolved = nodeById.get(l.source);
+          if (resolved) (l as { source: unknown }).source = resolved;
+        }
+        if (typeof l.target === "string") {
+          const resolved = nodeById.get(l.target);
+          if (resolved) (l as { target: unknown }).target = resolved;
+        }
+      }
+      return prev;
+    }
     const result = { nodes, links, _nodeSig: nodeSig, _linkSig: linkSig };
     graphDataRef.current = result;
     return result;
@@ -355,39 +389,14 @@ export default function GraphView({
           }
           pinnedByAddTimerRef.current = null;
         }, 200);
-      } else if (linkSig !== linkSigRef.current) {
-        // Edge added or removed — defer reheat until pins release so
-        // the layout settles smoothly instead of jolting all nodes at once.
-        pendingReheatRef.current = true;
-        const pinned = new Set<string>();
-        for (const n of graphData.nodes) {
-          if (n.fx === undefined && n.fy === undefined) {
-            pinned.add(n.id);
-            n.fx = n.x;
-            n.fy = n.y;
-          }
-        }
-        if (pinnedByAddTimerRef.current) clearTimeout(pinnedByAddTimerRef.current);
-        pinnedByAddTimerRef.current = setTimeout(() => {
-          for (const n of graphData.nodes) {
-            if (pinned.has(n.id)) {
-              n.fx = undefined;
-              n.fy = undefined;
-            }
-          }
-          pinnedByAddTimerRef.current = null;
-          if (pendingReheatRef.current) {
-            pendingReheatRef.current = false;
-            fgRef.current?.d3ReheatSimulation();
-          }
-        }, 200);
       }
 
-      // Defer reheat if a node is being dragged — reheating mid-drag causes
-      // d3-force to fight the locked fx/fy, resulting in viewport drift.
-      if (!pendingReheatRef.current && !isDraggingRef.current) {
-        g.d3ReheatSimulation();
-      } else if (!pendingReheatRef.current) {
+      // Only reheat when nodes changed (added/deleted). Link-only changes
+      // (edge add/delete) don't reheat — the simulation is already cool so
+      // nodes stay in place while the edge appears/disappears.
+      if (nodeSig !== nodeSigRef.current && !isDraggingRef.current) {
+        gentleReheat(g);
+      } else if (nodeSig !== nodeSigRef.current) {
         pendingReheatRef.current = true;
       }
     }
@@ -718,7 +727,7 @@ export default function GraphView({
             dragNodeIdRef.current = null;
             if (pendingReheatRef.current) {
               pendingReheatRef.current = false;
-              fgRef.current?.d3ReheatSimulation();
+              if (fgRef.current) gentleReheat(fgRef.current);
             }
           }}
           enablePanInteraction={(e: MouseEvent) => !isDraggingRef.current && !pendingPlacement}
