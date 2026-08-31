@@ -109,3 +109,26 @@ export function overlap(a: string[], b: string[]): string[] {
   const lower = new Set(b.map((s) => s.toLowerCase()));
   return a.filter((s) => lower.has(s.toLowerCase()));
 }
+
+// --- Recommendation types ---
+
+export interface RecommendedPerson {
+  name: string;
+  avatarUrl: string | null;
+  headline: string | null;
+  company: string | null;
+  location: string | null;
+  skills: string[];
+  interests: string[];
+  githubLogin: string | null;
+  score: number;
+  reasons: string[];
+  reasonDetails: {
+    mutualConnections?: string[];
+    sharedSkills?: string[];
+    sharedInterests?: string[];
+    company?: string;
+    location?: string;
+    contributedRepos?: string[];
+  };
+}

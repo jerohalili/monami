@@ -8,16 +8,39 @@ import {
   formToPersonPayload,
   type PersonFormState,
 } from "./PersonFormFields";
-import type { Person } from "@/lib/model";
+import type { Person, RecommendedPerson } from "@/lib/model";
+
+/** Convert a RecommendedPerson into form state for pre-filling. */
+function recommendationToForm(r: RecommendedPerson): PersonFormState {
+  return {
+    name: r.name,
+    nickname: "",
+    avatarUrl: r.avatarUrl ?? "",
+    headline: r.headline ?? "",
+    company: r.company ?? "",
+    location: r.location ?? "",
+    email: "",
+    githubLogin: r.githubLogin ?? "",
+    skills: r.skills.join(", "),
+    interests: r.interests.join(", "),
+    tags: "",
+    notes: "",
+    linksRaw: r.githubLogin ? `GitHub: https://github.com/${r.githubLogin}` : "",
+  };
+}
 
 export default function AddPersonModal({
   onClose,
   onCreated,
+  prefilled,
 }: {
   onClose: () => void;
   onCreated: (person: Person) => void;
+  prefilled?: RecommendedPerson;
 }) {
-  const [form, setForm] = useState<PersonFormState>(EMPTY_PERSON_FORM);
+  const [form, setForm] = useState<PersonFormState>(
+    prefilled ? recommendationToForm(prefilled) : EMPTY_PERSON_FORM,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

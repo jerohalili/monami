@@ -304,7 +304,16 @@ export default function NetworkApp() {
       </div>
       {activeTab === "discover" && (
         <div className="absolute inset-0 z-10">
-          <DiscoverView query={query} />
+          <DiscoverView
+            query={query}
+            onSwitchToNetwork={(person) => {
+              setActiveTab("network");
+              // Set pendingPlacement before load so GraphView excludes the node
+              // from the simulation until the user clicks to place it.
+              setPendingPlacement({ id: person.id, name: person.name });
+              load();
+            }}
+          />
         </div>
       )}
 
