@@ -493,7 +493,7 @@ export default function GraphView({
   const paintPointerArea = (raw: object, color: string, ctx: CanvasRenderingContext2D, _globalScale: number) => {
     const n = raw as GNode;
     if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) return;
-    const r = radiusOf(n) + 10; // generous padding for touch targets
+    const r = radiusOf(n) + 2; // minimal padding
     ctx.beginPath();
     ctx.arc(n.x!, n.y!, r, 0, Math.PI * 2);
     ctx.fillStyle = color;
@@ -716,6 +716,17 @@ export default function GraphView({
           linkLabel={() => ""}
           linkCanvasObject={paintCustomLink}
           linkCanvasObjectMode={() => "replace"}
+          linkPointerAreaPaint={(raw: object, color: string, ctx: CanvasRenderingContext2D, globalScale: number) => {
+            const e = raw as Relationship & { source: { x: number; y: number }; target: { x: number; y: number } };
+            if (!Number.isFinite(e.source?.x) || !Number.isFinite(e.target?.x)) return;
+            ctx.beginPath();
+            ctx.moveTo(e.source.x, e.source.y);
+            ctx.lineTo(e.target.x, e.target.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = (baseWidth(e.strength) + 10) / globalScale;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          }}
           onNodeClick={(n: object) => onSelectPerson((n as GNode).id)}
           onNodeHover={(n: object | null) => setHoverNode(n ? (n as GNode).id : null)}
           onNodeDrag={(n: object) => {
