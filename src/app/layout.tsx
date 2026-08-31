@@ -3,7 +3,7 @@ import Providers from "@/components/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MonAmi — your network constellation",
+  title: "MonAmi",
   description:
     "An interactive graph of your professional network: people, shared context, and connections.",
 };
