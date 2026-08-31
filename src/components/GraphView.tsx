@@ -147,6 +147,13 @@ export default function GraphView({
         }
       } else {
         existing = { ...p, degree: degree[p.id] ?? 0 } as GNode;
+        // Apply pending pin for newly placed nodes so they appear at the
+        // click position instead of drifting to d3-force's default.
+        const pin = pendingPinRef.current;
+        if (pin && pin.id === p.id) {
+          existing.fx = pin.x;
+          existing.fy = pin.y;
+        }
         map.set(p.id, existing);
         addedNodeRef.current = true;
       }
