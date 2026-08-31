@@ -356,8 +356,9 @@ export default function GraphView({
           pinnedByAddTimerRef.current = null;
         }, 200);
       } else if (linkSig !== linkSigRef.current) {
-        // Edge added or removed — pin nodes so the layout settles
-        // smoothly instead of jolting all nodes at once.
+        // Edge added or removed — defer reheat until pins release so
+        // the layout settles smoothly instead of jolting all nodes at once.
+        pendingReheatRef.current = true;
         const pinned = new Set<string>();
         for (const n of graphData.nodes) {
           if (n.fx === undefined && n.fy === undefined) {
@@ -375,14 +376,18 @@ export default function GraphView({
             }
           }
           pinnedByAddTimerRef.current = null;
+          if (pendingReheatRef.current) {
+            pendingReheatRef.current = false;
+            fgRef.current?.d3ReheatSimulation();
+          }
         }, 200);
       }
 
       // Defer reheat if a node is being dragged — reheating mid-drag causes
       // d3-force to fight the locked fx/fy, resulting in viewport drift.
-      if (!isDraggingRef.current) {
+      if (!pendingReheatRef.current && !isDraggingRef.current) {
         g.d3ReheatSimulation();
-      } else {
+      } else if (!pendingReheatRef.current) {
         pendingReheatRef.current = true;
       }
     }
