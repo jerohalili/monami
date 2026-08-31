@@ -227,7 +227,11 @@ function PeopleSection({ recommendations, error, onAdd }: { recommendations: Rec
 function PersonCard({ person, onAdd }: { person: RecommendedPerson; onAdd: (person: RecommendedPerson) => void }) {
   const [expanded, setExpanded] = useState(false);
   const d = person.reasonDetails;
-  const hasDetails = d.mutualConnections?.length || d.sharedSkills?.length || d.sharedInterests?.length || d.company || d.location || d.contributedRepos?.length;
+  // Only show expandable when it adds info beyond what the pills show:
+  // - Mutual connection NAMES (pill just says "3 mutual connections")
+  // - Multiple contributed repos (pill just says "Contributor to multiple repos")
+  const hasExpandableDetail = (d.mutualConnections && d.mutualConnections.length > 0) ||
+    (d.contributedRepos && d.contributedRepos.length > 1);
 
   return (
     <div className="rounded-xl transition-colors hover:bg-white/5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
@@ -308,8 +312,8 @@ function PersonCard({ person, onAdd }: { person: RecommendedPerson; onAdd: (pers
         </div>
       </div>
 
-      {/* Expandable detail section */}
-      {hasDetails && (
+      {/* Expandable detail section — only when it adds info beyond the pills */}
+      {hasExpandableDetail && (
         <div style={{ borderTop: expanded ? "1px solid var(--border)" : "none" }}>
           <button
             className="flex w-full items-center justify-between px-4 py-2 text-xs transition-colors hover:bg-white/5"
@@ -339,48 +343,7 @@ function PersonCard({ person, onAdd }: { person: RecommendedPerson; onAdd: (pers
                   </div>
                 </div>
               )}
-              {d.sharedSkills && d.sharedSkills.length > 0 && (
-                <div>
-                  <p className="mb-1 text-xs font-medium" style={{ color: "var(--text-muted)" }}>Shared skills</p>
-                  <div className="flex flex-wrap gap-1">
-                    {d.sharedSkills.map((skill) => (
-                      <span key={skill} className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs" style={{ background: "var(--bg-main)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {d.sharedInterests && d.sharedInterests.length > 0 && (
-                <div>
-                  <p className="mb-1 text-xs font-medium" style={{ color: "var(--text-muted)" }}>Shared interests</p>
-                  <div className="flex flex-wrap gap-1">
-                    {d.sharedInterests.map((interest) => (
-                      <span key={interest} className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs" style={{ background: "var(--bg-main)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(d.company || d.location) && (
-                <div>
-                  <p className="mb-1 text-xs font-medium" style={{ color: "var(--text-muted)" }}>Match</p>
-                  <div className="flex flex-wrap gap-1">
-                    {d.company && (
-                      <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs" style={{ background: "var(--bg-main)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
-                        Works at {d.company}
-                      </span>
-                    )}
-                    {d.location && (
-                      <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs" style={{ background: "var(--bg-main)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
-                        Located in {d.location}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              {d.contributedRepos && d.contributedRepos.length > 0 && (
+              {d.contributedRepos && d.contributedRepos.length > 1 && (
                 <div>
                   <p className="mb-1 text-xs font-medium" style={{ color: "var(--text-muted)" }}>Contributed to</p>
                   <div className="flex flex-wrap gap-1">

@@ -9,6 +9,7 @@ import {
   getGitHubToken,
   fetchGitHubRepos,
   fetchGitHubRepoContributors,
+  githubFetch,
 } from "@/lib/github";
 
 interface Candidate {
@@ -44,7 +45,7 @@ export async function GET() {
     // Fetch all existing people in the network (to find mutual connections and exclude)
     const existingPeople = await db.person.findMany({
       where: { userId },
-      select: { id: true, githubLogin: true, name: true, skills: true, interests: true, company: true, location: true },
+      select: { id: true, githubLogin: true, name: true, skills: true, interests: true, company: true, location: true, headline: true },
     });
 
     const existingIds = new Set(existingPeople.map((p) => p.id));
@@ -240,6 +241,108 @@ export async function GET() {
         }
       } catch {
         // GitHub token might be expired or invalid, skip GitHub signals
+      }
+    }
+
+    // --- Step 5: Enrich GitHub-only candidates ---
+    // For candidates with a githubLogin, merge DB profile data and fetch
+    // GitHub profiles to enable skills/interests/company/location matching.
+
+    // Build a lookup: githubLogin -> existingPerson
+    const loginToPerson = new Map<string, (typeof existingPeople)[number]>();
+    for (const p of existingPeople) {
+      if (p.githubLogin) loginToPerson.set(p.githubLogin, p);
+    }
+
+    // Sort candidates by score to prioritize enrichment of top candidates
+    const sortedCandidates = Array.from(candidates.values())
+      .filter((c) => c.githubLogin && c.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    // Merge DB profiles and collect logins needing GitHub profile fetch
+    const needsGithubFetch: Candidate[] = [];
+    for (const c of sortedCandidates) {
+      if (!c.githubLogin) continue;
+      const dbPerson = loginToPerson.get(c.githubLogin);
+      if (dbPerson) {
+        // Merge profile data from DB if candidate is missing it
+        const dbSkills: string[] = Array.isArray(dbPerson.skills) ? (dbPerson.skills as string[]) : [];
+        const dbInterests: string[] = Array.isArray(dbPerson.interests) ? (dbPerson.interests as string[]) : [];
+        if (c.skills.length === 0 && dbSkills.length > 0) c.skills = dbSkills;
+        if (c.interests.length === 0 && dbInterests.length > 0) c.interests = dbInterests;
+        if (!c.company && dbPerson.company) c.company = dbPerson.company;
+        if (!c.location && dbPerson.location) c.location = dbPerson.location;
+        if (!c.headline && dbPerson.headline) c.headline = dbPerson.headline;
+      } else if (!c.company && !c.location) {
+        // No DB match and missing profile data — fetch from GitHub
+        needsGithubFetch.push(c);
+      }
+    }
+
+    // Fetch GitHub profiles for top candidates missing company/location (max 10)
+    if (token && needsGithubFetch.length > 0) {
+      const toFetch = needsGithubFetch.slice(0, 10);
+      await Promise.allSettled(
+        toFetch.map(async (c) => {
+          if (!c.githubLogin || !token) return;
+          try {
+            const profile = await githubFetch<{
+              company: string | null;
+              location: string | null;
+              bio: string | null;
+              avatar_url: string;
+              name: string | null;
+            }>(token, `/users/${c.githubLogin}`);
+            if (!c.company && profile.company) c.company = profile.company;
+            if (!c.location && profile.location) c.location = profile.location;
+            if (!c.headline && profile.bio) c.headline = profile.bio;
+            if (profile.name && c.name === c.githubLogin) c.name = profile.name;
+            if (profile.avatar_url && c.avatarUrl === autoAvatarUrl(c.name)) {
+              c.avatarUrl = profile.avatar_url;
+            }
+          } catch {
+            // Skip on rate limit or other errors
+          }
+        }),
+      );
+    }
+
+    // Re-run skills/interests/company/location overlap with "me" node
+    if (meNode) {
+      const mySkills: string[] = Array.isArray(meNode.skills) ? (meNode.skills as string[]) : [];
+      const myInterests: string[] = Array.isArray(meNode.interests) ? (meNode.interests as string[]) : [];
+      const myCompany = meNode.company?.toLowerCase();
+      const myLocation = meNode.location?.toLowerCase();
+
+      for (const c of sortedCandidates) {
+        // Skills & interests overlap
+        if (c.skills.length > 0 || c.interests.length > 0) {
+          const sharedSkills = overlap(mySkills, c.skills);
+          const sharedInterests = overlap(myInterests, c.interests);
+
+          if (sharedSkills.length > 0 && !c.reasonDetails.sharedSkills) {
+            c.score += sharedSkills.length;
+            c.reasons.push(`Shares skills: ${sharedSkills.slice(0, 3).join(", ")}`);
+            c.reasonDetails.sharedSkills = sharedSkills;
+          }
+          if (sharedInterests.length > 0 && !c.reasonDetails.sharedInterests) {
+            c.score += sharedInterests.length * 1.5;
+            c.reasons.push(`Shares interests: ${sharedInterests.slice(0, 3).join(", ")}`);
+            c.reasonDetails.sharedInterests = sharedInterests;
+          }
+        }
+
+        // Company & location match
+        if (myCompany && c.company?.toLowerCase() === myCompany && !c.reasonDetails.company) {
+          c.score += 2;
+          c.reasons.push(`Works at ${c.company}`);
+          c.reasonDetails.company = c.company;
+        }
+        if (myLocation && c.location?.toLowerCase() === myLocation && !c.reasonDetails.location) {
+          c.score += 1;
+          c.reasons.push(`Located in ${c.location}`);
+          c.reasonDetails.location = c.location;
+        }
       }
     }
 

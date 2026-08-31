@@ -11,6 +11,7 @@ import {
   fetchGitHubFollowing,
   fetchUserFollowers,
   getRateLimitRemaining,
+  githubFetch,
   type GitHubUser,
 } from "@/lib/github";
 import { fetchWithRetry, MIN_RATE_LIMIT } from "@/lib/github-utils";
@@ -140,12 +141,28 @@ export async function POST(req: Request) {
         }
         // Mutual follow → just "github"
 
+        // Fetch GitHub profile for company/location/bio
+        let profileData: { company: string | null; location: string | null; bio: string | null; name: string | null } | null = null;
+        try {
+          profileData = await githubFetch<{
+            company: string | null;
+            location: string | null;
+            bio: string | null;
+            name: string | null;
+          }>(token, `/users/${login}`);
+        } catch {
+          // Skip profile fetch on error — create person with basic data
+        }
+
         person = await db.person.create({
           data: {
             userId,
-            name: gh.login,
+            name: profileData?.name || gh.login,
             avatarUrl: gh.avatar_url,
             githubLogin: gh.login,
+            company: profileData?.company || null,
+            location: profileData?.location || null,
+            headline: profileData?.bio || null,
             skills: [],
             interests: [],
             tags,
@@ -187,6 +204,26 @@ export async function POST(req: Request) {
               tags: newTags,
             },
           });
+
+          // Refresh profile data for github-tagged people
+          try {
+            const profile = await githubFetch<{
+              company: string | null;
+              location: string | null;
+              bio: string | null;
+              name: string | null;
+            }>(token, `/users/${login}`);
+            const updateData: Record<string, unknown> = {};
+            if (profile.company) updateData.company = profile.company;
+            if (profile.location) updateData.location = profile.location;
+            if (profile.bio) updateData.headline = profile.bio;
+            if (profile.name) updateData.name = profile.name;
+            if (Object.keys(updateData).length > 0) {
+              await db.person.update({ where: { id: person.id }, data: updateData });
+            }
+          } catch {
+            // Skip profile refresh on error
+          }
         }
       }
 

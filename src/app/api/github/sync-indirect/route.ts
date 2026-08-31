@@ -9,6 +9,7 @@ import {
   fetchUserFollowers,
   fetchUserFollowing,
   getRateLimitRemaining,
+  githubFetch,
   type GitHubUser,
 } from "@/lib/github";
 import { fetchWithRetry, MIN_RATE_LIMIT } from "@/lib/github-utils";
@@ -209,12 +210,29 @@ export async function POST(req: Request) {
         }
 
         try {
+          // Fetch GitHub profile for company/location/bio
+          let profileData: { company: string | null; location: string | null; bio: string | null; name: string | null } | null = null;
+          try {
+            profileData = await githubFetch<{
+              company: string | null;
+              location: string | null;
+              bio: string | null;
+              name: string | null;
+            }>(token, `/users/${indirectLogin}`);
+            apiCallsUsed++;
+          } catch {
+            // Skip profile fetch on error
+          }
+
           const person = await db.person.create({
             data: {
               userId,
-              name: gh.login,
+              name: profileData?.name || gh.login,
               avatarUrl: gh.avatar_url,
               githubLogin: gh.login,
+              company: profileData?.company || null,
+              location: profileData?.location || null,
+              headline: profileData?.bio || null,
               skills: [],
               interests: [],
               tags: ["github", "github_indirect"],
