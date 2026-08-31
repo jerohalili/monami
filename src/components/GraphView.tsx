@@ -512,21 +512,15 @@ export default function GraphView({
     const isY = isYouNode(n);
     const dimmed = matchedIds !== null && !matchedIds.has(n.id);
     const alpha = dimmed ? 0.12 : 1;
+    const isLight = document.documentElement.getAttribute("data-theme") === "light";
 
     ctx.save();
     ctx.globalAlpha = alpha;
 
     // Glow for selected / hovered / neighbor nodes.
     if (isSel || isNb || isHover) {
-      ctx.shadowColor = "#8b5cf6";
+      ctx.shadowColor = "#fbbf24";
       ctx.shadowBlur = isSel ? 20 : 10;
-    }
-    // Selection ring.
-    if (isSel) {
-      ctx.beginPath();
-      ctx.arc(n.x!, n.y!, r + 5 / scale, 0, Math.PI * 2);
-      ctx.fillStyle = hexToRgba("#8b5cf6", 0.25);
-      ctx.fill();
     }
 
     const cx = n.x!;
@@ -565,18 +559,17 @@ export default function GraphView({
     ctx.shadowBlur = 0;
 
     // Border ring.
-    if (isY || isSel) {
+    if (isSel || isNb || isHover) {
       ctx.beginPath();
       ctx.arc(cx, cy, r + 2.5 / scale, 0, Math.PI * 2);
-      const isLight = document.documentElement.getAttribute("data-theme") === "light";
-      ctx.strokeStyle = isY && !isSel ? "#fbbf24" : isLight ? "#1e293b" : "#ffffff";
-      ctx.lineWidth = 2 / scale;
+      ctx.strokeStyle = "#fbbf24";
+      ctx.lineWidth = 2.5 / scale;
       ctx.stroke();
-    } else if (isNb || isHover) {
+    } else if (isY) {
       ctx.beginPath();
       ctx.arc(cx, cy, r + 2.5 / scale, 0, Math.PI * 2);
-      ctx.strokeStyle = hexToRgba("#a78bfa", 0.8);
-      ctx.lineWidth = 1.6 / scale;
+      ctx.strokeStyle = isLight ? "#7c3aed" : "#8b5cf6";
+      ctx.lineWidth = 2.5 / scale;
       ctx.stroke();
     }
 
@@ -589,7 +582,6 @@ export default function GraphView({
       const label = n.nickname || n.name;
       const ly = cy + r + 4 / scale;
       const tw = ctx.measureText(label).width;
-      const isLight = document.documentElement.getAttribute("data-theme") === "light";
       ctx.fillStyle = isLight ? "rgba(255,255,255,0.85)" : "rgba(5,7,13,0.55)";
       ctx.fillRect(cx - tw / 2 - 3 / scale, ly - 2 / scale, tw + 6 / scale, fs + 4 / scale);
       ctx.fillStyle = isSel ? (isLight ? "#0f172a" : "#ffffff") : isLight ? "#1e293b" : "#cbd5e1";
@@ -626,6 +618,7 @@ export default function GraphView({
     if (matchedIds && !(matchedIds.has(sid) && matchedIds.has(tid))) alpha = 0.06;
 
     const w = baseWidth(e.strength) / globalScale;
+    const isLight = document.documentElement.getAttribute("data-theme") === "light";
 
     // Glow behind selected edges
     if (e.id === selectedEdgeId) {
@@ -633,7 +626,7 @@ export default function GraphView({
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(tx, ty);
-      ctx.strokeStyle = hexToRgba(base, 0.25);
+      ctx.strokeStyle = hexToRgba("#fbbf24", 0.25);
       ctx.lineWidth = (baseWidth(e.strength) + 8) / globalScale;
       ctx.lineCap = "round";
       ctx.stroke();
@@ -641,7 +634,9 @@ export default function GraphView({
     }
 
     ctx.save();
-    ctx.strokeStyle = hexToRgba(base, alpha);
+    const isSelectedEdge = e.id === selectedEdgeId;
+    const edgeColor = isSelectedEdge ? "#fbbf24" : base;
+    ctx.strokeStyle = hexToRgba(edgeColor, alpha);
     ctx.lineWidth = w;
     ctx.lineCap = "round";
 

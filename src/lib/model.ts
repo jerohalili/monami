@@ -56,21 +56,28 @@ export interface GraphPayload {
 
 // --- Utility functions ---
 
-const NODE_PALETTE = [
+const DARK_NODE_PALETTE = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
   "#06b6d4", "#f97316", "#84cc16", "#eab308", "#14b8a6",
+];
+
+const LIGHT_NODE_PALETTE = [
+  "#4f46e5", "#7c3aed", "#db2777", "#d97706", "#059669",
+  "#0891b2", "#ea580c", "#65a30d", "#ca8a04", "#0d9488",
 ];
 
 /** Deterministic color from a name string. */
 export function colorForName(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return NODE_PALETTE[h % NODE_PALETTE.length];
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  const palette = isLight ? LIGHT_NODE_PALETTE : DARK_NODE_PALETTE;
+  return palette[h % palette.length];
 }
 
-/** Node fill color: amber for "You", palette hash for everyone else. */
+/** Node fill color from palette hash. */
 export function nodeColor(name: string): string {
-  return name === "You" ? "#fbbf24" : colorForName(name);
+  return colorForName(name);
 }
 
 /** Auto-generated avatar URL using Dicebear notionists style. */
