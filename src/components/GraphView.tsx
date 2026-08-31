@@ -355,6 +355,27 @@ export default function GraphView({
           }
           pinnedByAddTimerRef.current = null;
         }, 200);
+      } else if (linkSig !== linkSigRef.current) {
+        // Edge added or removed — pin nodes so the layout settles
+        // smoothly instead of jolting all nodes at once.
+        const pinned = new Set<string>();
+        for (const n of graphData.nodes) {
+          if (n.fx === undefined && n.fy === undefined) {
+            pinned.add(n.id);
+            n.fx = n.x;
+            n.fy = n.y;
+          }
+        }
+        if (pinnedByAddTimerRef.current) clearTimeout(pinnedByAddTimerRef.current);
+        pinnedByAddTimerRef.current = setTimeout(() => {
+          for (const n of graphData.nodes) {
+            if (pinned.has(n.id)) {
+              n.fx = undefined;
+              n.fy = undefined;
+            }
+          }
+          pinnedByAddTimerRef.current = null;
+        }, 200);
       }
 
       // Defer reheat if a node is being dragged — reheating mid-drag causes
