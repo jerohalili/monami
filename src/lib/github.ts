@@ -121,6 +121,22 @@ export async function fetchUserFollowing(
   return fetchPaginated<GitHubUser>(token, `/users/${username}/following`, maxPages);
 }
 
+export async function fetchUserStarredRepos(
+  token: string,
+  username: string,
+  maxPages = 1,
+): Promise<GitHubRepo[]> {
+  return fetchPaginated<GitHubRepo>(token, `/users/${username}/starred`, maxPages);
+}
+
+export async function fetchUserRepos(
+  token: string,
+  username: string,
+  maxPages = 1,
+): Promise<GitHubRepo[]> {
+  return fetchPaginated<GitHubRepo>(token, `/users/${username}/repos?sort=updated`, maxPages);
+}
+
 export interface RateLimitInfo {
   remaining: number;
   limit: number;

@@ -10,10 +10,12 @@ import {
   fetchGitHubFollowers,
   fetchGitHubFollowing,
   fetchUserFollowers,
+  fetchUserRepos,
   getRateLimitRemaining,
   githubFetch,
   type GitHubUser,
 } from "@/lib/github";
+import { extractSkillsFromRepos } from "@/lib/skills";
 import { fetchWithRetry, MIN_RATE_LIMIT } from "@/lib/github-utils";
 
 type SyncFilter = "all" | "following" | "mutual";
@@ -154,6 +156,15 @@ export async function POST(req: Request) {
           // Skip profile fetch on error — create person with basic data
         }
 
+        // Extract skills from user's repos
+        let extractedSkills: string[] = [];
+        try {
+          const repos = await fetchUserRepos(token, login, 1);
+          extractedSkills = extractSkillsFromRepos(repos);
+        } catch {
+          // Skip repo fetch on error
+        }
+
         person = await db.person.create({
           data: {
             userId,
@@ -163,7 +174,7 @@ export async function POST(req: Request) {
             company: profileData?.company || null,
             location: profileData?.location || null,
             headline: profileData?.bio || null,
-            skills: [],
+            skills: extractedSkills,
             interests: [],
             tags,
             links: {},
@@ -218,6 +229,16 @@ export async function POST(req: Request) {
             if (profile.location) updateData.location = profile.location;
             if (profile.bio) updateData.headline = profile.bio;
             if (profile.name) updateData.name = profile.name;
+
+            // Extract skills from repos
+            try {
+              const repos = await fetchUserRepos(token, login, 1);
+              const skills = extractSkillsFromRepos(repos);
+              if (skills.length > 0) updateData.skills = skills;
+            } catch {
+              // Skip repo fetch on error
+            }
+
             if (Object.keys(updateData).length > 0) {
               await db.person.update({ where: { id: person.id }, data: updateData });
             }

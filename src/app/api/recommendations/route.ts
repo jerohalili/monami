@@ -1,14 +1,20 @@
 // GET /api/recommendations — multi-signal people recommendations.
-// Combines: mutual connections, skills/interests overlap, company/location, GitHub data.
+// Combines: mutual connections, skills/interests overlap, company/location,
+// GitHub contributors, connections' starred repos.
+// Improvements: skill normalization, edge strength weighting, recency weighting,
+// connections' starred repos signal, diversity cap.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/auth-guard";
 import { autoAvatarUrl, overlap } from "@/lib/model";
+import { normalizeSkills, extractSkillsFromRepos } from "@/lib/skills";
 import {
   getGitHubToken,
   fetchGitHubRepos,
   fetchGitHubRepoContributors,
+  fetchUserStarredRepos,
+  fetchUserRepos,
   githubFetch,
 } from "@/lib/github";
 
@@ -30,6 +36,7 @@ interface Candidate {
     company?: string;
     location?: string;
     contributedRepos?: string[];
+    starredBy?: string[];
   };
 }
 
@@ -42,10 +49,30 @@ export async function GET() {
       where: { userId, tags: { array_contains: "me" } },
     });
 
+    // Normalize meNode skills/interests for consistent comparison
+    const mySkills = meNode
+      ? normalizeSkills(Array.isArray(meNode.skills) ? (meNode.skills as string[]) : [])
+      : [];
+    const myInterests = meNode
+      ? normalizeSkills(Array.isArray(meNode.interests) ? (meNode.interests as string[]) : [])
+      : [];
+    const myCompany = meNode?.company?.toLowerCase() ?? null;
+    const myLocation = meNode?.location?.toLowerCase() ?? null;
+
     // Fetch all existing people in the network (to find mutual connections and exclude)
     const existingPeople = await db.person.findMany({
       where: { userId },
-      select: { id: true, githubLogin: true, name: true, skills: true, interests: true, company: true, location: true, headline: true },
+      select: {
+        id: true,
+        githubLogin: true,
+        name: true,
+        skills: true,
+        interests: true,
+        company: true,
+        location: true,
+        headline: true,
+        updatedAt: true,
+      },
     });
 
     const existingIds = new Set(existingPeople.map((p) => p.id));
@@ -64,13 +91,19 @@ export async function GET() {
       select: { sourceId: true, targetId: true, strength: true },
     });
 
-    // Build adjacency: personId -> Set of connected personIds
+    // Build adjacency and edge strength maps (bidirectional)
     const adjacency = new Map<string, Set<string>>();
+    const edgeStrength = new Map<string, Map<string, number>>();
     for (const e of edges) {
       if (!adjacency.has(e.sourceId)) adjacency.set(e.sourceId, new Set());
       if (!adjacency.has(e.targetId)) adjacency.set(e.targetId, new Set());
       adjacency.get(e.sourceId)!.add(e.targetId);
       adjacency.get(e.targetId)!.add(e.sourceId);
+
+      if (!edgeStrength.has(e.sourceId)) edgeStrength.set(e.sourceId, new Map());
+      if (!edgeStrength.has(e.targetId)) edgeStrength.set(e.targetId, new Map());
+      edgeStrength.get(e.sourceId)!.set(e.targetId, e.strength);
+      edgeStrength.get(e.targetId)!.set(e.sourceId, e.strength);
     }
 
     const candidates = new Map<string, Candidate>();
@@ -96,16 +129,23 @@ export async function GET() {
     };
 
     // --- Signal 1: Mutual connections (second-degree people) ---
-    // Find people connected to 2+ of the user's existing contacts but not in the network
-    const secondDegreeCounts = new Map<string, { count: number; connections: string[] }>();
+    // Find people connected to 2+ of the user's existing contacts but not in the network.
+    // Edge strength weighting: stronger connections contribute more to the score.
+    const secondDegreeCounts = new Map<string, {
+      count: number;
+      connections: string[];
+      totalStrength: number;
+    }>();
 
     for (const [personId, neighbors] of adjacency) {
       if (!existingIds.has(personId)) continue;
       for (const neighborId of neighbors) {
         if (existingIds.has(neighborId)) continue;
+        const strength = edgeStrength.get(personId)?.get(neighborId) ?? 2;
         const existing = secondDegreeCounts.get(neighborId);
         if (existing) {
           existing.count++;
+          existing.totalStrength += strength;
           const person = existingPeople.find((p) => p.id === personId);
           if (person) existing.connections.push(person.name);
         } else {
@@ -113,16 +153,20 @@ export async function GET() {
           secondDegreeCounts.set(neighborId, {
             count: 1,
             connections: person ? [person.name] : [],
+            totalStrength: strength,
           });
         }
       }
     }
 
-    // These are people in the DB who are second-degree connections
-    for (const [personId, { count, connections }] of secondDegreeCounts) {
-      if (count < 2) continue; // Need at least 2 mutual connections
+    for (const [personId, { count, connections, totalStrength }] of secondDegreeCounts) {
+      if (count < 2) continue;
       const person = await db.person.findUnique({ where: { id: personId } });
       if (!person) continue;
+
+      // Edge strength weighting: avgStrength 1→1.0, 2→1.33, 3→1.67
+      const avgStrength = totalStrength / count;
+      const strengthMultiplier = 1 + (avgStrength - 1) * 0.33;
 
       const c = getOrCreate(personId, {
         name: person.name,
@@ -130,37 +174,39 @@ export async function GET() {
         headline: person.headline,
         company: person.company,
         location: person.location,
-        skills: Array.isArray(person.skills) ? (person.skills as string[]) : [],
-        interests: Array.isArray(person.interests) ? (person.interests as string[]) : [],
+        skills: normalizeSkills(Array.isArray(person.skills) ? (person.skills as string[]) : []),
+        interests: normalizeSkills(Array.isArray(person.interests) ? (person.interests as string[]) : []),
         githubLogin: person.githubLogin,
       });
-      c.score += count * 2;
+      c.score += count * 2 * strengthMultiplier;
       c.reasons.push(`${count} mutual connection${count > 1 ? "s" : ""}`);
       c.reasonDetails.mutualConnections = connections;
     }
 
     // --- Signal 2: Skills & interests overlap with "me" node ---
+    // Checks existing people in the DB who aren't yet connected to anyone.
+    // Recency weighting: recently updated profiles get a small freshness boost.
     if (meNode) {
-      const mySkills: string[] = Array.isArray(meNode.skills) ? (meNode.skills as string[]) : [];
-      const myInterests: string[] = Array.isArray(meNode.interests) ? (meNode.interests as string[]) : [];
-
-      // Check skills/interests overlap with existing people (might be useful for weak connections)
       for (const person of existingPeople) {
-        if (adjacency.has(person.id)) continue; // Skip people already connected to someone
-        const personSkills: string[] = Array.isArray(person.skills) ? (person.skills as string[]) : [];
-        const personInterests: string[] = Array.isArray(person.interests) ? (person.interests as string[]) : [];
+        if (adjacency.has(person.id)) continue;
+        const personSkills = normalizeSkills(Array.isArray(person.skills) ? (person.skills as string[]) : []);
+        const personInterests = normalizeSkills(Array.isArray(person.interests) ? (person.interests as string[]) : []);
 
         const sharedSkills = overlap(mySkills, personSkills);
         const sharedInterests = overlap(myInterests, personInterests);
 
         if (sharedSkills.length > 0 || sharedInterests.length > 0) {
+          // Recency boost: profiles updated in last 30 days get 1.1x
+          const profileAgeDays = (Date.now() - new Date(person.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+          const freshnessBoost = profileAgeDays < 30 ? 1.1 : 1.0;
+
           const c = getOrCreate(person.id, {
             name: person.name,
             company: person.company,
             location: person.location,
             githubLogin: person.githubLogin,
           });
-          c.score += sharedSkills.length + sharedInterests.length * 1.5;
+          c.score += (sharedSkills.length + sharedInterests.length * 1.5) * freshnessBoost;
           if (sharedSkills.length > 0) {
             c.reasons.push(`Shares skills: ${sharedSkills.slice(0, 3).join(", ")}`);
             c.reasonDetails.sharedSkills = sharedSkills;
@@ -175,9 +221,6 @@ export async function GET() {
 
     // --- Signal 3: Company & location matches ---
     if (meNode) {
-      const myCompany = meNode.company?.toLowerCase();
-      const myLocation = meNode.location?.toLowerCase();
-
       for (const person of existingPeople) {
         if (person.id === meNode.id) continue;
         if (adjacency.has(person.id)) continue;
@@ -202,7 +245,7 @@ export async function GET() {
       }
     }
 
-    // --- Signal 4: GitHub contributors ---
+    // --- Signal 4: GitHub contributors (with recency weighting) ---
     const token = await getGitHubToken(userId);
     if (token) {
       try {
@@ -211,6 +254,16 @@ export async function GET() {
           try {
             const [owner, repoName] = repo.full_name.split("/");
             const contributors = await fetchGitHubRepoContributors(token, owner, repoName);
+
+            // Recency factor: repos updated in last 90 days get full score,
+            // decaying to 0.3 over ~2 years
+            const repoAgeDays = (Date.now() - new Date(repo.updated_at).getTime()) / (1000 * 60 * 60 * 24);
+            const recencyFactor = repoAgeDays < 90
+              ? 1
+              : repoAgeDays < 365
+                ? 1 - ((repoAgeDays - 90) / 510) * 0.7
+                : 0.3;
+
             for (const contributor of contributors) {
               if (existingLogins.has(contributor.login)) continue;
 
@@ -219,7 +272,7 @@ export async function GET() {
                 avatarUrl: contributor.avatar_url,
                 githubLogin: contributor.login,
               });
-              c.score += 1;
+              c.score += recencyFactor;
               if (!c.reasonDetails.contributedRepos) {
                 c.reasonDetails.contributedRepos = [];
               }
@@ -244,42 +297,109 @@ export async function GET() {
       }
     }
 
-    // --- Step 5: Enrich GitHub-only candidates ---
+    // --- Signal 5: Connections' starred repos ---
+    // Analyzes what repos your direct connections star (not just your own).
+    // Repos starred by 2+ connections are strong interest signals.
+    if (token) {
+      try {
+        // Get direct connections with GitHub logins, prioritized by edge strength
+        const directConnections = existingPeople
+          .filter((p) => {
+            if (!p.githubLogin || p.id === meNode?.id) return false;
+            return adjacency.has(p.id);
+          })
+          .sort((a, b) => {
+            const strengthA = meNode ? (edgeStrength.get(meNode.id)?.get(a.id) ?? 0) : 0;
+            const strengthB = meNode ? (edgeStrength.get(meNode.id)?.get(b.id) ?? 0) : 0;
+            return strengthB - strengthA;
+          })
+          .slice(0, 5);
+
+        // Track which repos are starred by which connections
+        const repoStarredBy = new Map<string, { connectionNames: string[]; repoName: string }>();
+
+        for (const connection of directConnections) {
+          if (!connection.githubLogin) continue;
+          try {
+            const starred = await fetchUserStarredRepos(token, connection.githubLogin, 1);
+            for (const repo of starred.slice(0, 30)) {
+              const key = repo.full_name;
+              const existing = repoStarredBy.get(key);
+              if (existing) {
+                if (!existing.connectionNames.includes(connection.name)) {
+                  existing.connectionNames.push(connection.name);
+                }
+              } else {
+                repoStarredBy.set(key, {
+                  connectionNames: [connection.name],
+                  repoName: repo.name,
+                });
+              }
+            }
+          } catch {
+            // Skip on rate limit or error
+          }
+        }
+
+        // Create candidates from repos starred by 2+ connections
+        for (const [, { connectionNames, repoName }] of repoStarredBy) {
+          if (connectionNames.length < 2) continue;
+
+          const key = `starred:${repoName}`;
+          const existing = candidates.get(key);
+          if (existing) continue; // Already recommended via another signal
+
+          const c = getOrCreate(key, {
+            name: connectionNames.length === 1
+              ? `Starred by ${connectionNames[0]}`
+              : `Starred by ${connectionNames.join(", ")}`,
+            avatarUrl: null,
+          });
+          c.score += connectionNames.length * 1.5;
+          c.reasons.push(
+            connectionNames.length === 1
+              ? `Starred by ${connectionNames[0]}`
+              : `Starred by ${connectionNames.length} connections`,
+          );
+          c.reasonDetails.starredBy = connectionNames;
+        }
+      } catch {
+        // GitHub token might be expired or invalid
+      }
+    }
+
+    // --- Step 6: Enrich GitHub-only candidates ---
     // For candidates with a githubLogin, merge DB profile data and fetch
     // GitHub profiles to enable skills/interests/company/location matching.
 
-    // Build a lookup: githubLogin -> existingPerson
     const loginToPerson = new Map<string, (typeof existingPeople)[number]>();
     for (const p of existingPeople) {
       if (p.githubLogin) loginToPerson.set(p.githubLogin, p);
     }
 
-    // Sort candidates by score to prioritize enrichment of top candidates
     const sortedCandidates = Array.from(candidates.values())
       .filter((c) => c.githubLogin && c.score > 0)
       .sort((a, b) => b.score - a.score);
 
-    // Merge DB profiles and collect logins needing GitHub profile fetch
     const needsGithubFetch: Candidate[] = [];
     for (const c of sortedCandidates) {
       if (!c.githubLogin) continue;
       const dbPerson = loginToPerson.get(c.githubLogin);
       if (dbPerson) {
-        // Merge profile data from DB if candidate is missing it
-        const dbSkills: string[] = Array.isArray(dbPerson.skills) ? (dbPerson.skills as string[]) : [];
-        const dbInterests: string[] = Array.isArray(dbPerson.interests) ? (dbPerson.interests as string[]) : [];
+        const dbSkills = normalizeSkills(Array.isArray(dbPerson.skills) ? (dbPerson.skills as string[]) : []);
+        const dbInterests = normalizeSkills(Array.isArray(dbPerson.interests) ? (dbPerson.interests as string[]) : []);
         if (c.skills.length === 0 && dbSkills.length > 0) c.skills = dbSkills;
         if (c.interests.length === 0 && dbInterests.length > 0) c.interests = dbInterests;
         if (!c.company && dbPerson.company) c.company = dbPerson.company;
         if (!c.location && dbPerson.location) c.location = dbPerson.location;
         if (!c.headline && dbPerson.headline) c.headline = dbPerson.headline;
       } else if (!c.company && !c.location) {
-        // No DB match and missing profile data — fetch from GitHub
         needsGithubFetch.push(c);
       }
     }
 
     // Fetch GitHub profiles for top candidates missing company/location (max 10)
+    // Also fetch their repos to extract skills (language + topics)
     if (token && needsGithubFetch.length > 0) {
       const toFetch = needsGithubFetch.slice(0, 10);
       await Promise.allSettled(
@@ -303,54 +423,79 @@ export async function GET() {
           } catch {
             // Skip on rate limit or other errors
           }
+
+          // Extract skills from repos if candidate has no skills from DB
+          if (c.skills.length === 0) {
+            try {
+              const repos = await fetchUserRepos(token, c.githubLogin, 1);
+              const skills = extractSkillsFromRepos(repos);
+              if (skills.length > 0) c.skills = skills;
+            } catch {
+              // Skip repo fetch on error
+            }
+          }
         }),
       );
     }
 
     // Re-run skills/interests/company/location overlap with "me" node
-    if (meNode) {
-      const mySkills: string[] = Array.isArray(meNode.skills) ? (meNode.skills as string[]) : [];
-      const myInterests: string[] = Array.isArray(meNode.interests) ? (meNode.interests as string[]) : [];
-      const myCompany = meNode.company?.toLowerCase();
-      const myLocation = meNode.location?.toLowerCase();
+    // (now using normalized skills for accurate matching)
+    for (const c of sortedCandidates) {
+      const normalizedSkills = normalizeSkills(c.skills);
+      const normalizedInterests = normalizeSkills(c.interests);
 
-      for (const c of sortedCandidates) {
-        // Skills & interests overlap
-        if (c.skills.length > 0 || c.interests.length > 0) {
-          const sharedSkills = overlap(mySkills, c.skills);
-          const sharedInterests = overlap(myInterests, c.interests);
+      if (normalizedSkills.length > 0 || normalizedInterests.length > 0) {
+        const sharedSkills = overlap(mySkills, normalizedSkills);
+        const sharedInterests = overlap(myInterests, normalizedInterests);
 
-          if (sharedSkills.length > 0 && !c.reasonDetails.sharedSkills) {
-            c.score += sharedSkills.length;
-            c.reasons.push(`Shares skills: ${sharedSkills.slice(0, 3).join(", ")}`);
-            c.reasonDetails.sharedSkills = sharedSkills;
-          }
-          if (sharedInterests.length > 0 && !c.reasonDetails.sharedInterests) {
-            c.score += sharedInterests.length * 1.5;
-            c.reasons.push(`Shares interests: ${sharedInterests.slice(0, 3).join(", ")}`);
-            c.reasonDetails.sharedInterests = sharedInterests;
-          }
+        if (sharedSkills.length > 0 && !c.reasonDetails.sharedSkills) {
+          c.score += sharedSkills.length;
+          c.reasons.push(`Shares skills: ${sharedSkills.slice(0, 3).join(", ")}`);
+          c.reasonDetails.sharedSkills = sharedSkills;
         }
+        if (sharedInterests.length > 0 && !c.reasonDetails.sharedInterests) {
+          c.score += sharedInterests.length * 1.5;
+          c.reasons.push(`Shares interests: ${sharedInterests.slice(0, 3).join(", ")}`);
+          c.reasonDetails.sharedInterests = sharedInterests;
+        }
+      }
 
-        // Company & location match
-        if (myCompany && c.company?.toLowerCase() === myCompany && !c.reasonDetails.company) {
-          c.score += 2;
-          c.reasons.push(`Works at ${c.company}`);
-          c.reasonDetails.company = c.company;
-        }
-        if (myLocation && c.location?.toLowerCase() === myLocation && !c.reasonDetails.location) {
-          c.score += 1;
-          c.reasons.push(`Located in ${c.location}`);
-          c.reasonDetails.location = c.location;
-        }
+      // Company & location match
+      if (myCompany && c.company?.toLowerCase() === myCompany && !c.reasonDetails.company) {
+        c.score += 2;
+        c.reasons.push(`Works at ${c.company}`);
+        c.reasonDetails.company = c.company;
+      }
+      if (myLocation && c.location?.toLowerCase() === myLocation && !c.reasonDetails.location) {
+        c.score += 1;
+        c.reasons.push(`Located in ${c.location}`);
+        c.reasonDetails.location = c.location;
       }
     }
 
-    // Sort by score descending, return top 20
-    const results = Array.from(candidates.values())
+    // --- Step 7: Sort, diversity cap, and return ---
+    const sorted = Array.from(candidates.values())
       .filter((c) => c.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20);
+      .sort((a, b) => b.score - a.score);
+
+    // Diversity: cap at 4 from same company, 3 from same location
+    const companyCounts = new Map<string, number>();
+    const locationCounts = new Map<string, number>();
+    const diversified: Candidate[] = [];
+
+    for (const c of sorted) {
+      const compKey = c.company?.toLowerCase() ?? "";
+      const locKey = c.location?.toLowerCase() ?? "";
+
+      if (compKey && (companyCounts.get(compKey) ?? 0) >= 4) continue;
+      if (locKey && (locationCounts.get(locKey) ?? 0) >= 3) continue;
+
+      diversified.push(c);
+      if (compKey) companyCounts.set(compKey, (companyCounts.get(compKey) ?? 0) + 1);
+      if (locKey) locationCounts.set(locKey, (locationCounts.get(locKey) ?? 0) + 1);
+    }
+
+    const results = diversified.slice(0, 20);
 
     return NextResponse.json({ recommendations: results });
   } catch (e) {

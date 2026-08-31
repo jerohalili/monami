@@ -8,11 +8,13 @@ import {
   fetchGitHubProfile,
   fetchUserFollowers,
   fetchUserFollowing,
+  fetchUserRepos,
   getRateLimitRemaining,
   githubFetch,
   type GitHubUser,
 } from "@/lib/github";
 import { fetchWithRetry, MIN_RATE_LIMIT } from "@/lib/github-utils";
+import { extractSkillsFromRepos } from "@/lib/skills";
 
 export async function POST(req: Request) {
   try {
@@ -224,6 +226,16 @@ export async function POST(req: Request) {
             // Skip profile fetch on error
           }
 
+          // Extract skills from repos
+          let extractedSkills: string[] = [];
+          try {
+            const repos = await fetchUserRepos(token, indirectLogin, 1);
+            extractedSkills = extractSkillsFromRepos(repos);
+            apiCallsUsed++;
+          } catch {
+            // Skip repo fetch on error
+          }
+
           const person = await db.person.create({
             data: {
               userId,
@@ -233,7 +245,7 @@ export async function POST(req: Request) {
               company: profileData?.company || null,
               location: profileData?.location || null,
               headline: profileData?.bio || null,
-              skills: [],
+              skills: extractedSkills,
               interests: [],
               tags: ["github", "github_indirect"],
               links: {},
