@@ -188,6 +188,7 @@ export async function GET() {
     // Recency weighting: recently updated profiles get a small freshness boost.
     if (meNode) {
       for (const person of existingPeople) {
+        if (person.id === meNode.id) continue;
         if (adjacency.has(person.id)) continue;
         const personSkills = normalizeSkills(Array.isArray(person.skills) ? (person.skills as string[]) : []);
         const personInterests = normalizeSkills(Array.isArray(person.interests) ? (person.interests as string[]) : []);
