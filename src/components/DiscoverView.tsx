@@ -1,24 +1,15 @@
-// Discover tab: shows people recommendations and repos (own + starred).
+// Discover tab: shows people recommendations and repos (recommended, starred, your repos).
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { GitHubRepo } from "@/lib/github";
-import type { RecommendedPerson, Person } from "@/lib/model";
+import type { RecommendedPerson, Person, RecommendedRepo } from "@/lib/model";
 import { IconExternal, IconStar, IconGitBranch, IconCompass, IconPlus } from "./icons";
 import AddPersonModal from "./AddPersonModal";
 
-interface RecommendedRepo {
-  name: string;
-  full_name: string;
-  description: string | null;
-  html_url: string;
-  stargazers_count: number;
-  language: string | null;
-  starred_by: number;
-}
-
 type Tab = "people" | "repos";
+type RepoSubTab = "recommended" | "starred" | "yours";
 
 export default function DiscoverView({
   query,
@@ -28,9 +19,11 @@ export default function DiscoverView({
   onSwitchToNetwork?: (person: Person) => void;
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("people");
+  const [activeRepoSubTab, setActiveRepoSubTab] = useState<RepoSubTab>("recommended");
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [peopleRecommendations, setPeopleRecommendations] = useState<RecommendedPerson[]>([]);
   const [repoRecommendations, setRepoRecommendations] = useState<RecommendedRepo[]>([]);
+  const [recommendedRepos, setRecommendedRepos] = useState<RecommendedRepo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
@@ -63,16 +56,26 @@ export default function DiscoverView({
     });
   }, [repoRecommendations, query]);
 
+  const filteredRecommendedRepos = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return recommendedRepos;
+    return recommendedRepos.filter((repo) => {
+      const searchable = [repo.name, repo.full_name, repo.description ?? "", repo.language ?? "", ...repo.reasons].join(" ").toLowerCase();
+      return searchable.includes(q);
+    });
+  }, [recommendedRepos, query]);
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       setError(null);
       setSectionErrors({});
       try {
-        const [peopleRes, reposRecRes, reposRes] = await Promise.all([
+        const [peopleRes, reposRecRes, reposRes, recommendedRes] = await Promise.all([
           fetch("/api/recommendations"),
           fetch("/api/github/recommendations?type=repos"),
           fetch("/api/github/repos"),
+          fetch("/api/github/recommendations?type=recommended-repos"),
         ]);
 
         const errors: Record<string, string> = {};
@@ -90,7 +93,7 @@ export default function DiscoverView({
           setRepoRecommendations(reposRecData.recommendations || []);
         } else {
           const body = await reposRecRes.json().catch(() => null);
-          errors.repos = body?.error || `Failed to fetch recommendations (HTTP ${reposRecRes.status})`;
+          errors.repos = body?.error || `Failed to fetch starred repos (HTTP ${reposRecRes.status})`;
         }
 
         if (reposRes.ok) {
@@ -99,6 +102,14 @@ export default function DiscoverView({
         } else {
           const body = await reposRes.json().catch(() => null);
           errors.repos = body?.error || `Failed to fetch repos (HTTP ${reposRes.status})`;
+        }
+
+        if (recommendedRes.ok) {
+          const recommendedData = await recommendedRes.json();
+          setRecommendedRepos(recommendedData.recommendations || []);
+        } else {
+          const body = await recommendedRes.json().catch(() => null);
+          errors.recommended = body?.error || `Failed to fetch recommended repos (HTTP ${recommendedRes.status})`;
         }
 
         if (Object.keys(errors).length > 0) {
@@ -137,7 +148,7 @@ export default function DiscoverView({
   return (
     <div className="h-full overflow-y-auto p-4 pt-20">
       <div className="mx-auto max-w-4xl space-y-6">
-        {/* Tabs */}
+        {/* Main Tabs */}
         <div className="flex gap-1 rounded-xl p-1" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
           <button
             className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -164,7 +175,13 @@ export default function DiscoverView({
           {query.trim() && (
             <div className="text-xs" style={{ color: "var(--text-dim)" }}>
               {activeTab === "people" && `${filteredPeople.length} match${filteredPeople.length === 1 ? "" : "es"}`}
-              {activeTab === "repos" && `${filteredRepos.length + filteredRepoRecommendations.length} match${filteredRepos.length + filteredRepoRecommendations.length === 1 ? "" : "es"}`}
+              {activeTab === "repos" && (
+                <>
+                  {activeRepoSubTab === "recommended" && `${filteredRecommendedRepos.length} match${filteredRecommendedRepos.length === 1 ? "" : "es"}`}
+                  {activeRepoSubTab === "starred" && `${filteredRepoRecommendations.length} match${filteredRepoRecommendations.length === 1 ? "" : "es"}`}
+                  {activeRepoSubTab === "yours" && `${filteredRepos.length} match${filteredRepos.length === 1 ? "" : "es"}`}
+                </>
+              )}
             </div>
           )}
           {activeTab === "people" && (
@@ -172,9 +189,16 @@ export default function DiscoverView({
           )}
           {activeTab === "repos" && (
             <ReposSection
-              repos={filteredRepos}
-              repoRecommendations={filteredRepoRecommendations}
-              error={sectionErrors.repos}
+              recommendedRepos={filteredRecommendedRepos}
+              starredRepos={filteredRepoRecommendations}
+              yourRepos={filteredRepos}
+              activeSubTab={activeRepoSubTab}
+              setActiveSubTab={setActiveRepoSubTab}
+              errors={{
+                recommended: sectionErrors.recommended,
+                starred: sectionErrors.repos,
+                yours: sectionErrors.repos,
+              }}
             />
           )}
         </div>
@@ -231,9 +255,6 @@ function PeopleSection({ recommendations, error, onAdd }: { recommendations: Rec
 function PersonCard({ person, onAdd }: { person: RecommendedPerson; onAdd: (person: RecommendedPerson) => void }) {
   const [expanded, setExpanded] = useState(false);
   const d = person.reasonDetails;
-  // Only show expandable when it adds info beyond what the pills show:
-  // - Mutual connection NAMES (pill just says "3 mutual connections")
-  // - Multiple contributed repos (pill just says "Contributor to multiple repos")
   const hasExpandableDetail = (d.mutualConnections && d.mutualConnections.length > 0) ||
     (d.contributedRepos && d.contributedRepos.length > 1);
 
@@ -316,7 +337,6 @@ function PersonCard({ person, onAdd }: { person: RecommendedPerson; onAdd: (pers
         </div>
       </div>
 
-      {/* Expandable detail section — only when it adds info beyond the pills */}
       {hasExpandableDetail && (
         <div style={{ borderTop: expanded ? "1px solid var(--border)" : "none" }}>
           <button
@@ -367,11 +387,23 @@ function PersonCard({ person, onAdd }: { person: RecommendedPerson; onAdd: (pers
   );
 }
 
-function ReposSection({ repos, repoRecommendations, error }: { repos: GitHubRepo[]; repoRecommendations: RecommendedRepo[]; error?: string }) {
-  if (error) {
-    return <ErrorState message={error} />;
-  }
-  if (repos.length === 0 && repoRecommendations.length === 0) {
+function ReposSection({
+  recommendedRepos,
+  starredRepos,
+  yourRepos,
+  activeSubTab,
+  setActiveSubTab,
+  errors,
+}: {
+  recommendedRepos: RecommendedRepo[];
+  starredRepos: RecommendedRepo[];
+  yourRepos: GitHubRepo[];
+  activeSubTab: RepoSubTab;
+  setActiveSubTab: (tab: RepoSubTab) => void;
+  errors: { recommended?: string; starred?: string; yours?: string };
+}) {
+  const hasAnyData = recommendedRepos.length > 0 || starredRepos.length > 0 || yourRepos.length > 0;
+  if (!hasAnyData) {
     return (
       <EmptyState
         icon={<IconGitBranch width={24} height={24} />}
@@ -382,31 +414,111 @@ function ReposSection({ repos, repoRecommendations, error }: { repos: GitHubRepo
   }
 
   return (
-    <div className="space-y-6">
-      {repos.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>
-            Your Repositories
-          </h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {repos.map((repo) => (
-              <RepoCard key={repo.id} repo={repo} />
-            ))}
-          </div>
-        </div>
+    <div className="space-y-4">
+      {/* Repo Sub-navigation */}
+      <div className="flex gap-1 rounded-xl p-1" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+        <button
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            activeSubTab === "recommended" ? "bg-violet-500/20 text-violet-400" : "hover:bg-white/5"
+          }`}
+          style={{ color: activeSubTab === "recommended" ? undefined : "var(--text-muted)" }}
+          onClick={() => setActiveSubTab("recommended")}
+        >
+          Recommended
+        </button>
+        {starredRepos.length > 0 && (
+          <button
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              activeSubTab === "starred" ? "bg-violet-500/20 text-violet-400" : "hover:bg-white/5"
+            }`}
+            style={{ color: activeSubTab === "starred" ? undefined : "var(--text-muted)" }}
+            onClick={() => setActiveSubTab("starred")}
+          >
+            Starred
+          </button>
+        )}
+        {yourRepos.length > 0 && (
+          <button
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              activeSubTab === "yours" ? "bg-violet-500/20 text-violet-400" : "hover:bg-white/5"
+            }`}
+            style={{ color: activeSubTab === "yours" ? undefined : "var(--text-muted)" }}
+            onClick={() => setActiveSubTab("yours")}
+          >
+            Your Repos
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      {activeSubTab === "recommended" && (
+        <RepoSection
+          title="Recommended for You"
+          repos={recommendedRepos}
+          error={errors.recommended}
+          showReasons={true}
+          emptyTitle="No recommendations yet"
+          emptyDescription="Sync your GitHub connections and they'll need to star some repos for recommendations to appear."
+        />
       )}
-      {repoRecommendations.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>
-            Starred Repositories
-          </h3>
-          <div className="space-y-3">
-            {repoRecommendations.map((repo) => (
-              <RepoDiscoverCard key={repo.full_name} repo={repo} />
-            ))}
-          </div>
-        </div>
+      {activeSubTab === "starred" && (
+        <RepoSection
+          title="Your Starred Repositories"
+          repos={starredRepos}
+          error={errors.starred}
+          showReasons={false}
+        />
       )}
+      {activeSubTab === "yours" && (
+        <RepoSection
+          title="Your Repositories"
+          repos={yourRepos}
+          error={errors.yours}
+          showReasons={false}
+        />
+      )}
+    </div>
+  );
+}
+
+function RepoSection({
+  title,
+  repos,
+  error,
+  showReasons,
+  emptyTitle,
+  emptyDescription,
+}: {
+  title: string;
+  repos: (GitHubRepo | RecommendedRepo)[];
+  error?: string;
+  showReasons: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
+}) {
+  if (error) {
+    return <ErrorState message={error} />;
+  }
+  if (repos.length === 0) {
+    return (
+      <EmptyState
+        icon={<IconGitBranch width={24} height={24} />}
+        title={emptyTitle ?? "No repositories"}
+        description={emptyDescription ?? "No repositories match your current filter."}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>
+        {title}
+      </h3>
+      <div className="space-y-3">
+        {repos.map((repo) => (
+          <RepoDiscoverCard key={repo.full_name} repo={repo} showReasons={showReasons} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -452,7 +564,13 @@ function RepoCard({ repo }: { repo: GitHubRepo }) {
   );
 }
 
-function RepoDiscoverCard({ repo }: { repo: RecommendedRepo }) {
+function isRecommendedRepo(repo: GitHubRepo | RecommendedRepo): repo is RecommendedRepo {
+  return "reasons" in repo;
+}
+
+function RepoDiscoverCard({ repo, showReasons }: { repo: GitHubRepo | RecommendedRepo; showReasons?: boolean }) {
+  const recommended = isRecommendedRepo(repo);
+
   return (
     <div className="rounded-xl p-4 transition-colors hover:bg-white/5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
       <div className="flex items-start justify-between">
@@ -478,6 +596,18 @@ function RepoDiscoverCard({ repo }: { repo: RecommendedRepo }) {
           {repo.description}
         </p>
       )}
+      {showReasons && recommended && repo.reasons.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {repo.reasons.map((reason, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center rounded-md bg-violet-500/10 px-1.5 py-0.5 text-xs text-violet-400"
+            >
+              {reason}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="mt-3 flex items-center gap-4 text-xs" style={{ color: "var(--text-dim)" }}>
         {repo.language && (
           <span className="flex items-center gap-1">
@@ -489,9 +619,17 @@ function RepoDiscoverCard({ repo }: { repo: RecommendedRepo }) {
           <IconStar width={12} height={12} />
           {repo.stargazers_count}
         </span>
-        <span className="text-violet-400">
-          Starred by {repo.starred_by} connection{repo.starred_by === 1 ? "" : "s"}
-        </span>
+        {recommended && repo.starred_by && repo.starred_by > 1 && (
+          <span className="text-violet-400">
+            Starred by {repo.starred_by} connection{repo.starred_by === 1 ? "" : "s"}
+          </span>
+        )}
+        {!recommended && (
+          <span className="flex items-center gap-1">
+            <IconGitBranch width={12} height={12} />
+            {repo.forks_count}
+          </span>
+        )}
       </div>
     </div>
   );

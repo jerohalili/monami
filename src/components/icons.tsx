@@ -180,3 +180,20 @@ export function IconMore(props: P) {
     </svg>
   );
 }
+
+export function IconSparkles(props: P) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3v1M12 20v1M3 12h1M20 12h1M4.22 4.22l.71.71M19.07 19.07l.71.71M4.22 19.78l.71-.71M19.07 4.93l.71-.71" />
+      <path d="M10 4h4v4h-4zM14 16h4v4h-4z" strokeWidth={1.5} />
+    </svg>
+  );
+}
+
+export function IconBookmark(props: P) {
+  return (
+    <svg {...base(props)}>
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}

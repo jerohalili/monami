@@ -133,3 +133,18 @@ export interface RecommendedPerson {
   };
   candidateKey?: string;
 }
+
+export interface RecommendedRepo {
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  stargazers_count: number;
+  language: string | null;
+  starred_by: number;
+  reasons: string[];
+  reasonDetails: {
+    connectionsWhoStarred?: string[];
+    languageMatch?: string;
+  };
+}
