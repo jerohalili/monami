@@ -218,7 +218,11 @@ function PeopleSection({ recommendations, error, onAdd }: { recommendations: Rec
   return (
     <div className="space-y-3">
       {recommendations.map((person) => (
-        <PersonCard key={person.githubLogin ?? person.name} person={person} onAdd={onAdd} />
+        <PersonCard
+          key={person.candidateKey ?? person.githubLogin ?? person.name}
+          person={person}
+          onAdd={onAdd}
+        />
       ))}
     </div>
   );

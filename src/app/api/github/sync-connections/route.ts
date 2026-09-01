@@ -234,7 +234,7 @@ export async function POST(req: Request) {
             try {
               const repos = await fetchUserRepos(token, login, 1);
               const skills = extractSkillsFromRepos(repos);
-              if (skills.length > 0) updateData.skills = skills;
+              updateData.skills = skills;
             } catch {
               // Skip repo fetch on error
             }

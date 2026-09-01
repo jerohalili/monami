@@ -131,4 +131,5 @@ export interface RecommendedPerson {
     location?: string;
     contributedRepos?: string[];
   };
+  candidateKey?: string;
 }

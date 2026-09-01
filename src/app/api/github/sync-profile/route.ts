@@ -3,7 +3,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/auth-guard";
-import { getGitHubToken, fetchGitHubProfile } from "@/lib/github";
+import { getGitHubToken, fetchGitHubProfile, fetchGitHubRepos } from "@/lib/github";
+import { extractSkillsFromRepos } from "@/lib/skills";
 import { personDTO } from "@/lib/dto";
 
 export async function POST() {
@@ -40,6 +41,15 @@ export async function POST() {
       );
     }
 
+    // Extract skills from the user's own repos
+    let extractedSkills: string[] = [];
+    try {
+      const repos = await fetchGitHubRepos(token);
+      extractedSkills = extractSkillsFromRepos(repos);
+    } catch {
+      // Skip repo fetch on error
+    }
+
     // Full overwrite: always set fields from GitHub profile
     const data: Record<string, unknown> = {
       name: profile.name ?? profile.login,
@@ -49,12 +59,8 @@ export async function POST() {
       company: profile.company ?? null,
       location: profile.location ?? null,
       email: profile.email ?? null,
+      skills: extractedSkills,
     };
-
-    // Add GitHub profile link
-    const links = (you.links as Record<string, string>) ?? {};
-    links["GitHub"] = profile.html_url;
-    data.links = links;
 
     const updated = await db.person.update({
       where: { id: you.id },

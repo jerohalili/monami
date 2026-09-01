@@ -1,8 +1,8 @@
 // GET /api/recommendations — multi-signal people recommendations.
 // Combines: mutual connections, skills/interests overlap, company/location,
-// GitHub contributors, connections' starred repos.
+// GitHub contributors.
 // Improvements: skill normalization, edge strength weighting, recency weighting,
-// connections' starred repos signal, diversity cap.
+// diversity cap.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -13,7 +13,6 @@ import {
   getGitHubToken,
   fetchGitHubRepos,
   fetchGitHubRepoContributors,
-  fetchUserStarredRepos,
   fetchUserRepos,
   githubFetch,
 } from "@/lib/github";
@@ -38,6 +37,7 @@ interface Candidate {
     contributedRepos?: string[];
     starredBy?: string[];
   };
+  candidateKey?: string;
 }
 
 export async function GET() {
@@ -295,78 +295,7 @@ export async function GET() {
       } catch {
         // GitHub token might be expired or invalid, skip GitHub signals
       }
-    }
-
-    // --- Signal 5: Connections' starred repos ---
-    // Analyzes what repos your direct connections star (not just your own).
-    // Repos starred by 2+ connections are strong interest signals.
-    if (token) {
-      try {
-        // Get direct connections with GitHub logins, prioritized by edge strength
-        const directConnections = existingPeople
-          .filter((p) => {
-            if (!p.githubLogin || p.id === meNode?.id) return false;
-            return adjacency.has(p.id);
-          })
-          .sort((a, b) => {
-            const strengthA = meNode ? (edgeStrength.get(meNode.id)?.get(a.id) ?? 0) : 0;
-            const strengthB = meNode ? (edgeStrength.get(meNode.id)?.get(b.id) ?? 0) : 0;
-            return strengthB - strengthA;
-          })
-          .slice(0, 5);
-
-        // Track which repos are starred by which connections
-        const repoStarredBy = new Map<string, { connectionNames: string[]; repoName: string }>();
-
-        for (const connection of directConnections) {
-          if (!connection.githubLogin) continue;
-          try {
-            const starred = await fetchUserStarredRepos(token, connection.githubLogin, 1);
-            for (const repo of starred.slice(0, 30)) {
-              const key = repo.full_name;
-              const existing = repoStarredBy.get(key);
-              if (existing) {
-                if (!existing.connectionNames.includes(connection.name)) {
-                  existing.connectionNames.push(connection.name);
-                }
-              } else {
-                repoStarredBy.set(key, {
-                  connectionNames: [connection.name],
-                  repoName: repo.name,
-                });
-              }
-            }
-          } catch {
-            // Skip on rate limit or error
-          }
-        }
-
-        // Create candidates from repos starred by 2+ connections
-        for (const [, { connectionNames, repoName }] of repoStarredBy) {
-          if (connectionNames.length < 2) continue;
-
-          const key = `starred:${repoName}`;
-          const existing = candidates.get(key);
-          if (existing) continue; // Already recommended via another signal
-
-          const c = getOrCreate(key, {
-            name: connectionNames.length === 1
-              ? `Starred by ${connectionNames[0]}`
-              : `Starred by ${connectionNames.join(", ")}`,
-            avatarUrl: null,
-          });
-          c.score += connectionNames.length * 1.5;
-          c.reasons.push(
-            connectionNames.length === 1
-              ? `Starred by ${connectionNames[0]}`
-              : `Starred by ${connectionNames.length} connections`,
-          );
-          c.reasonDetails.starredBy = connectionNames;
-        }
-      } catch {
-        // GitHub token might be expired or invalid
-      }
-    }
+}
 
     // --- Step 6: Enrich GitHub-only candidates ---
     // For candidates with a githubLogin, merge DB profile data and fetch
@@ -424,15 +353,13 @@ export async function GET() {
             // Skip on rate limit or other errors
           }
 
-          // Extract skills from repos if candidate has no skills from DB
-          if (c.skills.length === 0) {
-            try {
-              const repos = await fetchUserRepos(token, c.githubLogin, 1);
-              const skills = extractSkillsFromRepos(repos);
-              if (skills.length > 0) c.skills = skills;
-            } catch {
-              // Skip repo fetch on error
-            }
+          // Extract skills from repos (always overwrite)
+          try {
+            const repos = await fetchUserRepos(token, c.githubLogin, 1);
+            const skills = extractSkillsFromRepos(repos);
+            c.skills = skills;
+          } catch {
+            // Skip repo fetch on error
           }
         }),
       );
