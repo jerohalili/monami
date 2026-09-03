@@ -146,7 +146,7 @@ export default function DiscoverView({
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 pt-20">
+    <div className="h-full overflow-y-auto p-4">
       <div className="mx-auto max-w-4xl space-y-6">
         {/* Main Tabs */}
         <div className="flex gap-1 rounded-xl p-1" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>

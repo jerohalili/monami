@@ -1,8 +1,7 @@
 // GET /api/recommendations — multi-signal people recommendations.
-// Combines: mutual connections, skills/interests overlap, company/location,
-// GitHub contributors.
-// Improvements: skill normalization, edge strength weighting, recency weighting,
-// diversity cap.
+// Combines: skills/interests overlap, company/location, GitHub contributors,
+// GitHub starred repos, GitHub followers/following.
+// Improvements: skill normalization, recency weighting, diversity cap.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -12,9 +11,13 @@ import { normalizeSkills, extractSkillsFromRepos } from "@/lib/skills";
 import {
   getGitHubToken,
   fetchGitHubRepos,
+  fetchGitHubStarredRepos,
   fetchGitHubRepoContributors,
+  fetchGitHubFollowers,
+  fetchGitHubFollowing,
   fetchUserRepos,
   githubFetch,
+  getRateLimitRemaining,
 } from "@/lib/github";
 
 interface Candidate {
@@ -29,7 +32,6 @@ interface Candidate {
   score: number;
   reasons: string[];
   reasonDetails: {
-    mutualConnections?: string[];
     sharedSkills?: string[];
     sharedInterests?: string[];
     company?: string;
@@ -75,7 +77,6 @@ export async function GET() {
       },
     });
 
-    const existingIds = new Set(existingPeople.map((p) => p.id));
     const existingLogins = new Set(
       existingPeople.map((p) => p.githubLogin).filter((l): l is string => l !== null),
     );
@@ -91,19 +92,13 @@ export async function GET() {
       select: { sourceId: true, targetId: true, strength: true },
     });
 
-    // Build adjacency and edge strength maps (bidirectional)
+    // Build adjacency map (bidirectional)
     const adjacency = new Map<string, Set<string>>();
-    const edgeStrength = new Map<string, Map<string, number>>();
     for (const e of edges) {
       if (!adjacency.has(e.sourceId)) adjacency.set(e.sourceId, new Set());
       if (!adjacency.has(e.targetId)) adjacency.set(e.targetId, new Set());
       adjacency.get(e.sourceId)!.add(e.targetId);
       adjacency.get(e.targetId)!.add(e.sourceId);
-
-      if (!edgeStrength.has(e.sourceId)) edgeStrength.set(e.sourceId, new Map());
-      if (!edgeStrength.has(e.targetId)) edgeStrength.set(e.targetId, new Map());
-      edgeStrength.get(e.sourceId)!.set(e.targetId, e.strength);
-      edgeStrength.get(e.targetId)!.set(e.sourceId, e.strength);
     }
 
     const candidates = new Map<string, Candidate>();
@@ -128,68 +123,14 @@ export async function GET() {
       return c;
     };
 
-    // --- Signal 1: Mutual connections (second-degree people) ---
-    // Find people connected to 2+ of the user's existing contacts but not in the network.
-    // Edge strength weighting: stronger connections contribute more to the score.
-    const secondDegreeCounts = new Map<string, {
-      count: number;
-      connections: string[];
-      totalStrength: number;
-    }>();
-
-    for (const [personId, neighbors] of adjacency) {
-      if (!existingIds.has(personId)) continue;
-      for (const neighborId of neighbors) {
-        if (existingIds.has(neighborId)) continue;
-        const strength = edgeStrength.get(personId)?.get(neighborId) ?? 2;
-        const existing = secondDegreeCounts.get(neighborId);
-        if (existing) {
-          existing.count++;
-          existing.totalStrength += strength;
-          const person = existingPeople.find((p) => p.id === personId);
-          if (person) existing.connections.push(person.name);
-        } else {
-          const person = existingPeople.find((p) => p.id === personId);
-          secondDegreeCounts.set(neighborId, {
-            count: 1,
-            connections: person ? [person.name] : [],
-            totalStrength: strength,
-          });
-        }
-      }
-    }
-
-    for (const [personId, { count, connections, totalStrength }] of secondDegreeCounts) {
-      if (count < 2) continue;
-      const person = await db.person.findUnique({ where: { id: personId } });
-      if (!person) continue;
-
-      // Edge strength weighting: avgStrength 1→1.0, 2→1.33, 3→1.67
-      const avgStrength = totalStrength / count;
-      const strengthMultiplier = 1 + (avgStrength - 1) * 0.33;
-
-      const c = getOrCreate(personId, {
-        name: person.name,
-        avatarUrl: person.avatarUrl,
-        headline: person.headline,
-        company: person.company,
-        location: person.location,
-        skills: normalizeSkills(Array.isArray(person.skills) ? (person.skills as string[]) : []),
-        interests: normalizeSkills(Array.isArray(person.interests) ? (person.interests as string[]) : []),
-        githubLogin: person.githubLogin,
-      });
-      c.score += count * 2 * strengthMultiplier;
-      c.reasons.push(`${count} mutual connection${count > 1 ? "s" : ""}`);
-      c.reasonDetails.mutualConnections = connections;
-    }
-
-    // --- Signal 2: Skills & interests overlap with "me" node ---
-    // Checks existing people in the DB who aren't yet connected to anyone.
+    // --- Signal 1: Skills & interests overlap with "me" node ---
+    // Checks people in the DB who aren't directly connected to "you".
     // Recency weighting: recently updated profiles get a small freshness boost.
     if (meNode) {
+      const myConnections = adjacency.get(meNode.id) ?? new Set();
       for (const person of existingPeople) {
         if (person.id === meNode.id) continue;
-        if (adjacency.has(person.id)) continue;
+        if (myConnections.has(person.id)) continue;
         const personSkills = normalizeSkills(Array.isArray(person.skills) ? (person.skills as string[]) : []);
         const personInterests = normalizeSkills(Array.isArray(person.interests) ? (person.interests as string[]) : []);
 
@@ -220,11 +161,12 @@ export async function GET() {
       }
     }
 
-    // --- Signal 3: Company & location matches ---
+    // --- Signal 2: Company & location matches ---
     if (meNode) {
+      const myConnections = adjacency.get(meNode.id) ?? new Set();
       for (const person of existingPeople) {
         if (person.id === meNode.id) continue;
-        if (adjacency.has(person.id)) continue;
+        if (myConnections.has(person.id)) continue;
 
         const c = getOrCreate(person.id, {
           name: person.name,
@@ -246,18 +188,27 @@ export async function GET() {
       }
     }
 
-    // --- Signal 4: GitHub contributors (with recency weighting) ---
+    // --- Signal 3: GitHub contributors (with recency weighting) ---
     const token = await getGitHubToken(userId);
+    let canCallGitHub = true;
     if (token) {
       try {
+        const rateLimit = await getRateLimitRemaining(token);
+        if (rateLimit.remaining < 30) canCallGitHub = false;
+      } catch {
+        // If we can't check rate limit, assume we can proceed
+      }
+    }
+
+    if (token && canCallGitHub) {
+      try {
+        // Own repos (up to 15)
         const repos = await fetchGitHubRepos(token);
-        for (const repo of repos.slice(0, 5)) {
+        for (const repo of repos.slice(0, 15)) {
           try {
             const [owner, repoName] = repo.full_name.split("/");
             const contributors = await fetchGitHubRepoContributors(token, owner, repoName);
 
-            // Recency factor: repos updated in last 90 days get full score,
-            // decaying to 0.3 over ~2 years
             const repoAgeDays = (Date.now() - new Date(repo.updated_at).getTime()) / (1000 * 60 * 60 * 24);
             const recencyFactor = repoAgeDays < 90
               ? 1
@@ -293,10 +244,104 @@ export async function GET() {
             // Skip repos where we can't fetch contributors
           }
         }
+
+        // Starred repos contributors (up to 10)
+        try {
+          const starredRepos = await fetchGitHubStarredRepos(token);
+          for (const repo of starredRepos.slice(0, 10)) {
+            try {
+              const [owner, repoName] = repo.full_name.split("/");
+              const contributors = await fetchGitHubRepoContributors(token, owner, repoName);
+
+              const repoAgeDays = (Date.now() - new Date(repo.updated_at).getTime()) / (1000 * 60 * 60 * 24);
+              const recencyFactor = (repoAgeDays < 90 ? 1 : repoAgeDays < 365 ? 1 - ((repoAgeDays - 90) / 510) * 0.7 : 0.3) * 0.5;
+
+              for (const contributor of contributors) {
+                if (existingLogins.has(contributor.login)) continue;
+
+                const c = getOrCreate(contributor.login, {
+                  name: contributor.name ?? contributor.login,
+                  avatarUrl: contributor.avatar_url,
+                  githubLogin: contributor.login,
+                });
+                c.score += recencyFactor;
+                if (!c.reasonDetails.contributedRepos) {
+                  c.reasonDetails.contributedRepos = [];
+                }
+                if (!c.reasonDetails.contributedRepos.includes(repo.name)) {
+                  c.reasonDetails.contributedRepos.push(repo.name);
+                }
+                if (!c.reasons.some((r) => r.startsWith("Contributor to"))) {
+                  c.reasons.push(`Contributor to ${repo.name}`);
+                } else {
+                  const idx = c.reasons.findIndex((r) => r.startsWith("Contributor to"));
+                  if (idx >= 0) {
+                    c.reasons[idx] = `Contributor to multiple repos`;
+                  }
+                }
+              }
+            } catch {
+              // Skip repos where we can't fetch contributors
+            }
+          }
+        } catch {
+          // Starred repos fetch might fail on rate limit
+        }
       } catch {
         // GitHub token might be expired or invalid, skip GitHub signals
       }
-}
+    }
+
+    // --- Signal 4: GitHub followers/following not in network ---
+    if (token && canCallGitHub) {
+      try {
+        const [followers, following] = await Promise.all([
+          fetchGitHubFollowers(token),
+          fetchGitHubFollowing(token),
+        ]);
+
+        const followerLogins = new Set(followers.map((u) => u.login));
+        const followingLogins = new Set(following.map((u) => u.login));
+
+        // Mutual follows (both follower and following) get higher score
+        for (const user of followers) {
+          if (existingLogins.has(user.login)) continue;
+          const isMutual = followingLogins.has(user.login);
+          const c = getOrCreate(user.login, {
+            name: user.login,
+            avatarUrl: user.avatar_url,
+            githubLogin: user.login,
+          });
+          c.score += isMutual ? 3 : 1;
+          if (isMutual && !c.reasons.some((r) => r.includes("mutual follow"))) {
+            c.reasons.push(`Mutual follow on GitHub`);
+          } else if (!isMutual && !c.reasons.some((r) => r.includes("follows you"))) {
+            c.reasons.push(`Follows you on GitHub`);
+          }
+        }
+
+        for (const user of following) {
+          if (existingLogins.has(user.login)) continue;
+          const isMutual = followerLogins.has(user.login);
+          const c = getOrCreate(user.login, {
+            name: user.login,
+            avatarUrl: user.avatar_url,
+            githubLogin: user.login,
+          });
+          // Only add score if not already scored from followers loop
+          if (!c.reasons.some((r) => r.includes("follow"))) {
+            c.score += isMutual ? 3 : 1;
+            if (isMutual) {
+              c.reasons.push(`Mutual follow on GitHub`);
+            } else {
+              c.reasons.push(`You follow on GitHub`);
+            }
+          }
+        }
+      } catch {
+        // Followers/following fetch might fail on rate limit
+      }
+    }
 
     // --- Step 6: Enrich GitHub-only candidates ---
     // For candidates with a githubLogin, merge DB profile data and fetch
@@ -406,7 +451,7 @@ export async function GET() {
       .filter((c) => c.score > 0)
       .sort((a, b) => b.score - a.score);
 
-    // Diversity: cap at 4 from same company, 3 from same location
+    // Diversity: cap at 6 from same company, 5 from same location
     const companyCounts = new Map<string, number>();
     const locationCounts = new Map<string, number>();
     const diversified: Candidate[] = [];
@@ -415,15 +460,19 @@ export async function GET() {
       const compKey = c.company?.toLowerCase() ?? "";
       const locKey = c.location?.toLowerCase() ?? "";
 
-      if (compKey && (companyCounts.get(compKey) ?? 0) >= 4) continue;
-      if (locKey && (locationCounts.get(locKey) ?? 0) >= 3) continue;
+      if (compKey && (companyCounts.get(compKey) ?? 0) >= 6) continue;
+      if (locKey && (locationCounts.get(locKey) ?? 0) >= 5) continue;
 
       diversified.push(c);
       if (compKey) companyCounts.set(compKey, (companyCounts.get(compKey) ?? 0) + 1);
       if (locKey) locationCounts.set(locKey, (locationCounts.get(locKey) ?? 0) + 1);
     }
 
-    const results = diversified.slice(0, 20);
+    for (const c of diversified) {
+      c.score = Math.round(c.score * 100) / 100;
+    }
+
+    const results = diversified.slice(0, 30);
 
     return NextResponse.json({ recommendations: results });
   } catch (e) {

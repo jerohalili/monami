@@ -282,8 +282,8 @@ export default function NetworkApp() {
 
   return (
     <ConfirmProvider>
-    <div className="relative h-dvh overflow-hidden">
-      <div className={`h-full ${activeTab !== "network" ? "invisible pointer-events-none" : ""}`}>
+    <div className="relative h-dvh overflow-hidden flex flex-col">
+      <div className={`absolute inset-0 ${activeTab !== "network" ? "invisible pointer-events-none" : ""}`}>
         <GraphView
           data={data ?? { people: [], edges: [] }}
           matchedIds={matchedIds}
@@ -302,33 +302,8 @@ export default function NetworkApp() {
           onReady={() => setGraphReady(true)}
         />
       </div>
-      {activeTab === "discover" && (
-        <div className="absolute inset-0 z-10">
-          <DiscoverView
-            query={query}
-            onSwitchToNetwork={(person) => {
-              setActiveTab("network");
-              // Set pendingPlacement before load so GraphView excludes the node
-              // from the simulation until the user clicks to place it.
-              setPendingPlacement({ id: person.id, name: person.name });
-              load();
-            }}
-          />
-        </div>
-      )}
-
-      {/* Loading overlay — covers everything while simulation runs on first load */}
-      {activeTab === "network" && !graphReady && data && data.people.length > 0 && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ color: "var(--text-muted)", background: "var(--bg)" }}>
-          <div className="flex flex-col items-center gap-3">
-            <IconLogo width={36} height={36} className="animate-pulse text-violet-400" />
-            <p className="text-sm">Charting your constellation...</p>
-          </div>
-        </div>
-      )}
-
       {/* Header bar */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-row flex-wrap items-center gap-2 p-3">
+      <header className="pointer-events-none relative z-30 flex flex-row flex-wrap items-center gap-2 p-3">
         <div className="pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-2 backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
           <IconLogo width={20} height={20} className="text-violet-400" />
           <span className="text-sm font-semibold tracking-tight" style={{ color: "var(--text)" }}>
@@ -560,90 +535,118 @@ export default function NetworkApp() {
         </div>
       </header>
 
-      {/* Zoom controls */}
-      {activeTab === "network" && (
-        <div className="pointer-events-auto absolute bottom-4 right-4 z-30 flex flex-col gap-1.5 rounded-xl p-1.5 backdrop-blur sm:bottom-4" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
-          <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.zoomIn()} title="Zoom in"><IconZoomIn /></button>
-          <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.zoomOut()} title="Zoom out"><IconZoomOut /></button>
-          <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.fit()} title="Fit view"><IconFit /></button>
+      {activeTab === "discover" && (
+        <div className="relative flex-1 min-h-0 z-10">
+          <DiscoverView
+            query={query}
+            onSwitchToNetwork={(person) => {
+              setActiveTab("network");
+              // Set pendingPlacement before load so GraphView excludes the node
+              // from the simulation until the user clicks to place it.
+              setPendingPlacement({ id: person.id, name: person.name });
+              load();
+            }}
+          />
         </div>
       )}
 
-      {/* Legend — toggleable on mobile, always visible on md+ */}
-      {activeTab === "network" && (
-        <div className="absolute bottom-4 left-3 z-30 md:left-4">
-          <button
-            className="pointer-events-auto flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs backdrop-blur md:hidden"
-            onClick={() => setShowLegend((v) => !v)}
-            style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}
-            title="Toggle legend"
-          >
-            <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} />
-            Legend
-          </button>
-          <div
-            className={`${showLegend ? "flex" : "hidden"} mt-1 max-w-[80vw] flex-wrap gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-xs backdrop-blur md:mt-0 md:flex`}
-            style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}
-          >
-            {Object.entries(ORIGINS).map(([k, v]) => (
-              <span key={k} className="inline-flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-full" style={{ background: v.color }} />
-                {v.label}
-              </span>
-            ))}
-            <span className="ml-1 inline-flex items-center gap-1 pl-2" style={{ borderLeft: "1px solid var(--border)" }}>
-              <span className="inline-block h-0 w-3 border-t border-dashed" style={{ borderColor: "var(--text-muted)" }} /> weak
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="inline-block h-0 w-3 border-t-2" style={{ borderColor: "var(--text-muted)" }} /> normal
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="inline-block h-0 w-3 border-t-[3px]" style={{ borderColor: "var(--text-muted)" }} /> strong
-            </span>
+      {/* Loading overlay — covers everything while simulation runs on first load */}
+      {activeTab === "network" && !graphReady && data && data.people.length > 0 && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ color: "var(--text-muted)", background: "var(--bg)" }}>
+          <div className="flex flex-col items-center gap-3">
+            <IconLogo width={36} height={36} className="animate-pulse text-violet-400" />
+            <p className="text-sm">Charting your constellation...</p>
           </div>
         </div>
       )}
 
-      {/* Details sidebar */}
-      {(selectedPerson || selectedEdge) && (
-        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md lg:bottom-4 lg:top-4 lg:left-auto lg:right-4 lg:max-h-none lg:w-100 lg:overflow-y-auto lg:rounded-2xl xl:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
-          {/* Drag handle — visible only on mobile */}
-          <div className="flex justify-center pt-2 lg:hidden">
-            <div className="h-1 w-10 rounded-full" style={{ background: "var(--border-strong)" }} />
-          </div>
-          <div className="space-y-4 p-4">
-            <DetailsPanel
-              person={selectedPerson}
-              edge={selectedEdge}
-              data={data!}
-              githubId={(session?.user as { githubId?: string })?.githubId ?? null}
-              onClose={() => { selectPerson(null); setSelectedEdgeId(null); }}
-              onSelectPerson={(id) => selectPerson(id)}
-              onChanged={async () => { await load(); }}
-              onClearedSelection={() => selectPerson(null)}
-              onEditEdgeSelected={selectPerson}
-              onSyncGithub={handleSyncGithub}
-              syncingGithub={syncingGithub}
-            />
-          </div>
-        </aside>
-      )}
+      {/* Background overlays (network tab) */}
+      <div className="absolute inset-0 pointer-events-none z-20">
+        {activeTab === "network" && (
+          <>
+            {/* Zoom controls */}
+            <div className="pointer-events-auto absolute bottom-4 right-4 z-30 flex flex-col gap-1.5 rounded-xl p-1.5 backdrop-blur sm:bottom-4" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+              <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.zoomIn()} title="Zoom in"><IconZoomIn /></button>
+              <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.zoomOut()} title="Zoom out"><IconZoomOut /></button>
+              <button className="btn px-2 py-1.5" onClick={() => apiRef.current?.fit()} title="Fit view"><IconFit /></button>
+            </div>
 
-      {/* Empty state */}
-      {empty && activeTab === "network" && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center p-6">
-          <div className="w-full max-w-sm space-y-4 rounded-2xl p-6 text-center shadow-2xl backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
-            <IconLogo width={40} height={40} className="mx-auto text-violet-400" />
-            <h1 className="text-lg font-semibold" style={{ color: "var(--text)" }}>Your sky is empty</h1>
-            <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
-              Add the first person to your constellation to get started.
-            </p>
-            <button className="btn-primary w-full" onClick={() => setShowAddPerson(true)}>
-              <IconPlus /> Add first person
-            </button>
-          </div>
-        </div>
-      )}
+            {/* Legend — toggleable on mobile, always visible on md+ */}
+            <div className="absolute bottom-4 left-3 z-30 md:left-4">
+              <button
+                className="pointer-events-auto flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs backdrop-blur md:hidden"
+                onClick={() => setShowLegend((v) => !v)}
+                style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}
+                title="Toggle legend"
+              >
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} />
+                Legend
+              </button>
+              <div
+                className={`${showLegend ? "flex" : "hidden"} mt-1 max-w-[80vw] flex-wrap gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-xs backdrop-blur md:mt-0 md:flex`}
+                style={{ border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)" }}
+              >
+                {Object.entries(ORIGINS).map(([k, v]) => (
+                  <span key={k} className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: v.color }} />
+                    {v.label}
+                  </span>
+                ))}
+                <span className="ml-1 inline-flex items-center gap-1 pl-2" style={{ borderLeft: "1px solid var(--border)" }}>
+                  <span className="inline-block h-0 w-3 border-t border-dashed" style={{ borderColor: "var(--text-muted)" }} /> weak
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-0 w-3 border-t-2" style={{ borderColor: "var(--text-muted)" }} /> normal
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-0 w-3 border-t-[3px]" style={{ borderColor: "var(--text-muted)" }} /> strong
+                </span>
+              </div>
+            </div>
+
+            {/* Empty state */}
+            {empty && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center p-6">
+                <div className="w-full max-w-sm space-y-4 rounded-2xl p-6 text-center shadow-2xl backdrop-blur" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+                  <IconLogo width={40} height={40} className="mx-auto text-violet-400" />
+                  <h1 className="text-lg font-semibold" style={{ color: "var(--text)" }}>Your sky is empty</h1>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                    Add the first person to your constellation to get started.
+                  </p>
+                  <button className="btn-primary w-full" onClick={() => setShowAddPerson(true)}>
+                    <IconPlus /> Add first person
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Details sidebar */}
+        {(selectedPerson || selectedEdge) && (
+          <aside className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md lg:bottom-4 lg:top-4 lg:left-auto lg:right-4 lg:max-h-none lg:w-100 lg:overflow-y-auto lg:rounded-2xl xl:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+            {/* Drag handle — visible only on mobile */}
+            <div className="flex justify-center pt-2 lg:hidden">
+              <div className="h-1 w-10 rounded-full" style={{ background: "var(--border-strong)" }} />
+            </div>
+            <div className="space-y-4 p-4">
+              <DetailsPanel
+                person={selectedPerson}
+                edge={selectedEdge}
+                data={data!}
+                githubId={(session?.user as { githubId?: string })?.githubId ?? null}
+                onClose={() => { selectPerson(null); setSelectedEdgeId(null); }}
+                onSelectPerson={(id) => selectPerson(id)}
+                onChanged={async () => { await load(); }}
+                onClearedSelection={() => selectPerson(null)}
+                onEditEdgeSelected={selectPerson}
+                onSyncGithub={handleSyncGithub}
+                syncingGithub={syncingGithub}
+              />
+            </div>
+          </aside>
+        )}
+      </div>
 
       {/* Modals */}
       {showAddPerson && data && (
