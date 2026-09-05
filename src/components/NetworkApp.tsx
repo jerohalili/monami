@@ -622,31 +622,32 @@ export default function NetworkApp() {
           </>
         )}
 
-        {/* Details sidebar */}
-        {(selectedPerson || selectedEdge) && (
-          <aside className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md lg:bottom-4 lg:top-4 lg:left-auto lg:right-4 lg:max-h-none lg:w-100 lg:overflow-y-auto lg:rounded-2xl xl:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
-            {/* Drag handle — visible only on mobile */}
-            <div className="flex justify-center pt-2 lg:hidden">
-              <div className="h-1 w-10 rounded-full" style={{ background: "var(--border-strong)" }} />
-            </div>
-            <div className="space-y-4 p-4">
-              <DetailsPanel
-                person={selectedPerson}
-                edge={selectedEdge}
-                data={data!}
-                githubId={(session?.user as { githubId?: string })?.githubId ?? null}
-                onClose={() => { selectPerson(null); setSelectedEdgeId(null); }}
-                onSelectPerson={(id) => selectPerson(id)}
-                onChanged={async () => { await load(); }}
-                onClearedSelection={() => selectPerson(null)}
-                onEditEdgeSelected={selectPerson}
-                onSyncGithub={handleSyncGithub}
-                syncingGithub={syncingGithub}
-              />
-            </div>
-          </aside>
-        )}
       </div>
+
+      {/* Details sidebar */}
+      {(selectedPerson || selectedEdge) && (
+        <aside className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md lg:bottom-4 lg:top-4 lg:left-auto lg:right-4 lg:max-h-none lg:w-100 lg:overflow-y-auto lg:rounded-2xl xl:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+          {/* Drag handle — visible only on mobile */}
+          <div className="flex justify-center pt-2 lg:hidden">
+            <div className="h-1 w-10 rounded-full" style={{ background: "var(--border-strong)" }} />
+          </div>
+          <div className="space-y-4 p-4">
+            <DetailsPanel
+              person={selectedPerson}
+              edge={selectedEdge}
+              data={data!}
+              githubId={(session?.user as { githubId?: string })?.githubId ?? null}
+              onClose={() => { selectPerson(null); setSelectedEdgeId(null); }}
+              onSelectPerson={(id) => selectPerson(id)}
+              onChanged={async () => { await load(); }}
+              onClearedSelection={() => selectPerson(null)}
+              onEditEdgeSelected={selectPerson}
+              onSyncGithub={handleSyncGithub}
+              syncingGithub={syncingGithub}
+            />
+          </div>
+        </aside>
+      )}
 
       {/* Modals */}
       {showAddPerson && data && (
