@@ -51,6 +51,9 @@ export default function NetworkApp() {
   const [showLegend, setShowLegend] = useState(false);
   const [activeTab, setActiveTab] = useState<"network" | "discover">("network");
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const dragStartY = useRef<number | null>(null);
+  const draggingRef = useRef(false);
 
   // Auto-dismiss toast after 5 seconds
   useEffect(() => {
@@ -59,6 +62,11 @@ export default function NetworkApp() {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Reset drag offset when selection changes
+  useEffect(() => {
+    setDragOffset(0);
+  }, [selectedPersonId, selectedEdgeId]);
 
   // Close indirect menu when clicking outside
   useEffect(() => {
@@ -355,7 +363,7 @@ export default function NetworkApp() {
           </button>
           <button
             className={`btn ${activeTab === "discover" ? "bg-violet-500/20 text-violet-400" : ""}`}
-            onClick={() => setActiveTab("discover")}
+            onClick={() => { setActiveTab("discover"); selectPerson(null); setSelectedEdgeId(null); }}
             title="Discover view"
           >
             <IconCompass />
@@ -626,9 +634,45 @@ export default function NetworkApp() {
 
       {/* Details sidebar */}
       {(selectedPerson || selectedEdge) && (
-        <aside className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md lg:bottom-4 lg:top-4 lg:left-auto lg:right-4 lg:max-h-none lg:w-100 lg:overflow-y-auto lg:rounded-2xl xl:w-107.5" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+        <aside
+          className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 max-h-[68vh] overflow-y-auto rounded-t-2xl shadow-2xl backdrop-blur-md lg:bottom-4 lg:top-4 lg:left-auto lg:right-4 lg:max-h-none lg:w-100 lg:overflow-y-auto lg:rounded-2xl xl:w-107.5"
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--bg-card)",
+            transform: `translateY(${dragOffset}px)`,
+            transition: dragOffset === 0 ? "transform 0.2s ease" : "none",
+            opacity: dragOffset > 0 ? Math.max(0.3, 1 - dragOffset / 400) : undefined,
+          }}
+          onTouchStart={(e) => {
+            if (window.matchMedia("(min-width: 1024px)").matches) return;
+            if (!draggingRef.current) return;
+            dragStartY.current = e.touches[0].clientY;
+          }}
+          onTouchMove={(e) => {
+            if (dragStartY.current === null) return;
+            const delta = e.touches[0].clientY - dragStartY.current;
+            if (delta > 0) setDragOffset(delta);
+          }}
+          onTouchEnd={() => {
+            if (dragStartY.current === null) return;
+            dragStartY.current = null;
+            draggingRef.current = false;
+            if (dragOffset > 120) {
+              selectPerson(null);
+              setSelectedEdgeId(null);
+            }
+            setDragOffset(0);
+          }}
+        >
           {/* Drag handle — visible only on mobile */}
-          <div className="flex justify-center pt-2 lg:hidden">
+          <div
+            className="flex justify-center pt-2 lg:hidden"
+            style={{ touchAction: "none" }}
+            onTouchStart={() => {
+              if (window.matchMedia("(min-width: 1024px)").matches) return;
+              draggingRef.current = true;
+            }}
+          >
             <div className="h-1 w-10 rounded-full" style={{ background: "var(--border-strong)" }} />
           </div>
           <div className="space-y-4 p-4">
