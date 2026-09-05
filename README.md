@@ -68,7 +68,7 @@ Physics are tuned to center the graph around your node and gently reheat on topo
 
 ### People & Relationship Management
 
-Full CRUD for person nodes (name, nickname, avatar, headline, company, location, email, skills, interests, tags, links, notes) and edges between them. Each edge carries origin type (in-person, GitHub, school, work, introduction, online, other), free-text context, shared communities, shared projects, strength level, and date met. A detail sidebar shows all metadata with inline edit mode — no page navigation needed.
+Full CRUD for person nodes (name, nickname, avatar, headline, company, location, email, skills, interests, tags, links, notes) and edges between them. Each edge carries origin type (in-person, GitHub, GitHub indirect, school, work, introduction, online, other), free-text context, shared communities, shared projects, strength level, and date met. A detail sidebar shows all metadata with inline edit mode — no page navigation needed.
 
 A custom confirm dialog replaces `window.confirm` for destructive actions.
 
@@ -78,11 +78,11 @@ A custom confirm dialog replaces `window.confirm` for destructive actions.
 - **Connection sync** — imports your GitHub followers and following as graph nodes. Filters: all, following-only, mutual-only. Creates cross-edges between imported people who follow each other.
 - **Indirect discovery** — explores followers/following of your direct connections to surface second-degree contacts you might not know about.
 - **Repos tab** — shows your GitHub repositories in a card grid with language, stars, and description.
-- **Recommendations** — suggests people to connect with based on shared repo contributors, and surfaces your starred repos as project recommendations.
+- **Recommendations** — suggests people to connect with based on shared repo contributors, mutual follows, skills/interests overlap, and company/location match. Project recommendations surface repos starred by your direct connections, scored by connection count and language match.
 
 ### Discover Tab
 
-Three sub-tabs: My Repos, People (recommendations), and Starred Repos. Each supports search filtering, shows empty states when there's nothing to display, and handles loading/error states gracefully.
+Two main tabs: People (recommendations) and Repos. The Repos tab has three sub-tabs: Recommended (repos starred by direct connections, scored by `connections × 2 + language match × 3`), Starred (your GitHub starred repos), and Your Repos (your GitHub repositories). Each supports search filtering, shows empty states when there's nothing to display, and handles loading/error states gracefully. People recommendations show scores, reasons, expandable detail breakdowns, and "Add" buttons that open a pre-filled person form.
 
 ### Dark / Light Theme
 
