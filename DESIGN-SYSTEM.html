@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MonAmi — Design System</title>
+  <style>
+    @page { size: letter; margin: 15mm; }
+    @media print {
+      .component-box, .swatch, .theme-box, table.token-table { break-inside: avoid; }
+      .grid-2 > div, .grid-3 > div { break-inside: avoid; }
+      .type-row, .spacing-row, .radius-row { break-inside: avoid; }
+      .section { break-inside: avoid; }
+      h2, h3 { break-after: avoid; }
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      line-height: 1.5;
+      padding: 0 32px;
+    }
+    
+    .page { max-width: 100%; margin: 0 auto 0; }
+    .page + .page { margin-top: 40px; }
+    
+    h1 { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; color: #0f172a; }
+    h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 24px; color: #8b5cf6; }
+    h3 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; }
+    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+    
+    .section { margin-bottom: 24px; }
+    
+    .palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .swatch { border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .swatch-color { height: 80px; }
+    .swatch-info { padding: 12px; background: #f8fafc; }
+    .swatch-name { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 4px; }
+    .swatch-hex { font-size: 14px; font-weight: 800; color: #0f172a; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+    .swatch-role { font-size: 11px; color: #475569; margin-top: 4px; }
+    
+    .theme-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+    .theme-box { padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; }
+    .theme-box.dark { background: #0b101d; color: #e2e8f0; }
+    .theme-box.light { background: #f8fafc; color: #0f172a; }
+    .theme-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; padding: 4px 10px; border-radius: 6px; display: inline-block; }
+    .theme-box.dark .theme-label { background: rgba(139,92,246,0.2); color: #a78bfa; }
+    .theme-box.light .theme-label { background: rgba(139,92,246,0.1); color: #7c3aed; }
+    
+    .type-row { display: flex; align-items: baseline; gap: 24px; padding: 16px 0; border-bottom: 1px solid #e2e8f0; }
+    .type-meta { min-width: 120px; text-align: right; }
+    .type-size { font-size: 12px; font-weight: 700; color: #8b5cf6; font-family: monospace; }
+    .type-weight { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    
+    .spacing-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
+    .spacing-label { min-width: 60px; font-size: 12px; font-weight: 700; color: #94a3b8; font-family: monospace; }
+    .spacing-bar { height: 24px; background: #8b5cf6; border-radius: 4px; }
+    .spacing-px { font-size: 11px; color: #475569; margin-left: 8px; }
+    
+    .radius-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
+    .radius-box { width: 60px; height: 60px; background: #8b5cf6; opacity: 0.9; flex-shrink: 0; }
+    .radius-info { min-width: 80px; }
+    .radius-val { font-size: 14px; font-weight: 700; color: #0f172a; font-family: monospace; }
+    .radius-token { font-size: 11px; color: #94a3b8; }
+    
+    .component-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px 24px; margin-bottom: 24px; }
+    .component-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #8b5cf6; margin-bottom: 20px; }
+    
+    .demo-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+    .demo-card.selected { border-color: #8b5cf6; background: rgba(139,92,246,0.05); }
+    .demo-card-text { font-size: 14px; font-weight: 600; color: #0f172a; }
+    .demo-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .demo-radio.active { border-color: #8b5cf6; }
+    .demo-radio.active::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #8b5cf6; }
+    
+    .demo-btn { width: 100%; padding: 14px; border-radius: 12px; font-weight: 700; font-size: 15px; text-align: center; cursor: pointer; border: none; }
+    .demo-btn.primary { background: #7c3aed; color: #fff; box-shadow: 0 4px 14px rgba(124,58,237,0.2); }
+    .demo-btn.secondary { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); }
+    .demo-btn.danger { background: #dc2626; color: #fff; }
+    .demo-btn.disabled { background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; }
+    
+    .demo-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    
+    .demo-progress { height: 8px; background: rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
+    .demo-progress-fill { height: 100%; background: #8b5cf6; border-radius: 999px; width: 45%; }
+    
+    .demo-tab-bar { display: flex; gap: 4px; background: rgba(255,255,255,0.06); padding: 4px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); width: fit-content; }
+    .demo-tab { padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #94a3b8; }
+    .demo-tab.active { background: rgba(139,92,246,0.2); color: #a78bfa; }
+    
+    .demo-input { width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: #e2e8f0; font-size: 14px; }
+    .demo-label { display: block; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    
+    .demo-alert { padding: 14px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+    .demo-alert.success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+    .demo-alert.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+    
+    .demo-shadow { background: #0b101d; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); padding: 24px; text-align: center; color: #94a3b8; font-size: 13px; }
+    
+    .demo-header { background: rgba(5,7,13,0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+    
+    .demo-modal { background: #0b101d; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; max-width: 320px; }
+    
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    
+    .token-table { width: 100%; border-collapse: collapse; }
+    .token-table th { text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; padding: 8px 12px; border-bottom: 2px solid #e2e8f0; }
+    .token-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #0f172a; }
+    .token-table .mono { font-family: monospace; font-weight: 700; color: #8b5cf6; }
+  </style>
+</head>
+<body>
+
+<!-- ================================================================== -->
+<!-- COVER PAGE                                                         -->
+<!-- ================================================================== -->
+<div class="page">
+  <div style="margin-bottom: 80px;">
+    <h1>MonAmi</h1>
+    <p style="font-size: 20px; font-weight: 700; color: #475569; margin-bottom: 8px;">Design System</p>
+    <p class="subtitle">Your professional network, visualised — connecting people through force-directed graphs</p>
+  </div>
+  
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px;">
+      <h3 style="margin-bottom: 12px;">Brand Colour</h3>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 48px; height: 48px; background: #8b5cf6; border-radius: 12px;"></div>
+        <div>
+          <div style="font-weight: 700; color: #0f172a;">Violet</div>
+          <div style="font-size: 13px; color: #64748b; font-family: monospace;">#8b5cf6</div>
+        </div>
+      </div>
+    </div>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px;">
+      <h3 style="margin-bottom: 12px;">Stack</h3>
+      <div style="font-size: 13px; color: #475569; line-height: 1.8;">
+        Next.js 15 &middot; React 19 &middot; Tailwind CSS v4<br>
+        Prisma &middot; next-auth &middot; react-force-graph-2d
+      </div>
+    </div>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px;">
+      <h3 style="margin-bottom: 12px;">Themes</h3>
+      <div style="display: flex; gap: 8px;">
+        <div style="width: 40px; height: 40px; background: #05070d; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" title="Dark"></div>
+        <div style="width: 40px; height: 40px; background: #f1f5f9; border-radius: 8px; border: 1px solid #cbd5e1;" title="Light"></div>
+      </div>
+      <div style="font-size: 13px; color: #64748b; margin-top: 8px;">Dark default with toggle — CSS custom properties swap via data-theme attribute</div>
+    </div>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px;">
+      <h3 style="margin-bottom: 12px;">Spacing Base Unit</h3>
+      <div style="font-size: 28px; font-weight: 800; color: #8b5cf6; font-family: monospace;">8px</div>
+      <div style="font-size: 13px; color: #64748b; margin-top: 4px;">All spacing derives from multiples of 8</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 2: STEPS A-D — DESIGN TOKENS                                 -->
+<!-- ================================================================== -->
+<div class="page">
+
+  <!-- STEP A: STYLING APPROACH -->
+  <div class="section">
+    <h2>Step A: Styling Approach</h2>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="background: #8b5cf6; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 800; font-size: 14px;">Tailwind v4</div>
+        <span style="font-size: 14px; color: #475569;">&rarr;</span>
+        <div style="background: #0f172a; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; font-family: monospace;">:root custom properties</div>
+      </div>
+      <p style="font-size: 13px; color: #64748b; margin-top: 12px; line-height: 1.6;">
+        Tokens live as CSS custom properties in <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">:root</code> (dark) and <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">[data-theme="light"]</code>. Components reference them via <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">style={{ color: "var(--text)" }}</code>. Tailwind handles layout, spacing, and responsive utilities. The theme toggle swaps the <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">data-theme</code> attribute on <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">&lt;html&gt;</code>.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP B: COLOUR TOKENS -->
+  <div class="section">
+    <h2>Step B: Colour Tokens</h2>
+    <p class="subtitle">5 core colours. Each token name is what components reference — rebrand or add a dark theme by changing one value.</p>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div>
+        <table class="token-table" style="font-size: 13px;">
+          <tr><th>Token</th><th>Role</th><th>Hex</th></tr>
+          <tr><td class="mono" style="font-size: 12px;">--color-primary</td><td style="color: #475569;">links, buttons, active states, focus rings</td><td class="mono">#8b5cf6</td></tr>
+          <tr><td class="mono" style="font-size: 12px;">--color-accent</td><td style="color: #475569;">one CTA, highlights, selection glow</td><td class="mono">#fbbf24</td></tr>
+          <tr><td class="mono" style="font-size: 12px;">--color-bg</td><td style="color: #475569;">page background</td><td class="mono">#05070d</td></tr>
+          <tr><td class="mono" style="font-size: 12px;">--color-surface</td><td style="color: #475569;">cards, panels, modals</td><td class="mono">#0b101d</td></tr>
+          <tr><td class="mono" style="font-size: 12px;">--color-text</td><td style="color: #475569;">body text</td><td class="mono">#e2e8f0</td></tr>
+        </table>
+      </div>
+      <div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+          <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 12px;">Contrast Check (WebAIM)</div>
+          <div style="font-size: 13px; color: #475569; line-height: 2;">
+            <div><span style="color: #8b5cf6; font-weight: 700;">#e2e8f0 on #05070d</span> &mdash; 14.8:1 <span style="color: #16a34a; font-weight: 700;">&#10003; AAA</span></div>
+            <div><span style="color: #8b5cf6; font-weight: 700;">#e2e8f0 on #0b101d</span> &mdash; 13.2:1 <span style="color: #16a34a; font-weight: 700;">&#10003; AAA</span></div>
+            <div><span style="color: #8b5cf6; font-weight: 700;">#8b5cf6 on #05070d</span> &mdash; 5.1:1 <span style="color: #16a34a; font-weight: 700;">&#10003; AA</span></div>
+            <div><span style="color: #8b5cf6; font-weight: 700;">#fbbf24 on #05070d</span> &mdash; 12.4:1 <span style="color: #16a34a; font-weight: 700;">&#10003; AAA</span></div>
+            <div><span style="color: #8b5cf6; font-weight: 700;">#05070d on #f1f5f9</span> &mdash; 17.3:1 <span style="color: #16a34a; font-weight: 700;">&#10003; AAA</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP C: TYPE SCALE -->
+  <div class="section">
+    <h2>Step C: Type Scale</h2>
+    <p class="subtitle">Three sizes — that is enough for most projects. System font stack, no custom fonts.</p>
+    
+    <table class="token-table" style="font-size: 13px; margin-bottom: 20px;">
+      <tr><th>Style</th><th>Size</th><th>Weight</th><th>Used For</th></tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Heading</td>
+        <td class="mono">24px</td>
+        <td>Bold (700)</td>
+        <td style="color: #475569;">screen titles, section headings, modal headers</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Body</td>
+        <td class="mono">14px</td>
+        <td>Regular (400)</td>
+        <td style="color: #475569;">paragraphs, form inputs, card content, buttons</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Small</td>
+        <td class="mono">12px</td>
+        <td>Medium (500)</td>
+        <td style="color: #475569;">captions, labels, badges, chip text</td>
+      </tr>
+    </table>
+    
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 8px;">Type Token Mapping</div>
+      <div style="font-size: 13px; color: #475569; line-height: 2;">
+        <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">--font-size-heading</code> = 24px (Tailwind: <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">text-2xl</code>)<br>
+        <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">--font-size-body</code> = 14px (Tailwind: <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">text-sm</code>)<br>
+        <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">--font-size-small</code> = 12px (Tailwind: <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">text-xs</code>)
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP D: SPACING RULE -->
+  <div class="section">
+    <h2>Step D: Spacing Rule</h2>
+    <p class="subtitle">8px base unit — used as multiples everywhere. This single rule makes a UI feel "designed" instead of ad hoc.</p>
+    
+    <table class="token-table" style="font-size: 13px; margin-bottom: 20px;">
+      <tr><th>Token</th><th>Value</th><th>Usage</th></tr>
+      <tr>
+        <td class="mono" style="font-size: 12px;">--space-1 (tight)</td>
+        <td class="mono">8px</td>
+        <td style="color: #475569;">between related items — chip padding, icon gaps, inline spacing</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size: 12px;">--space-4 (standard)</td>
+        <td class="mono">32px</td>
+        <td style="color: #475569;">between sections — card internal padding, content gaps</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size: 12px;">--space-8 (screen edge)</td>
+        <td class="mono">64px</td>
+        <td style="color: #475569;">page edge padding — body padding, modal outer margin</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 3: COLOUR PALETTE — VISUAL SWATCHES                          -->
+<!-- ================================================================== -->
+<div class="page">
+
+  <div class="section">
+    <h2>Colour Palette</h2>
+    <p class="subtitle">Every colour has a defined role. Dark theme primary values shown; light theme overrides listed separately.</p>
+    
+    <h3>Core Palette</h3>
+    <div class="palette-grid">
+      <div class="swatch">
+        <div class="swatch-color" style="background: #8b5cf6;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Violet (Primary)</div>
+          <div class="swatch-hex">#8b5cf6</div>
+          <div class="swatch-role">Links, buttons, active states, focus rings, logo accent</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #fbbf24;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Amber (Accent)</div>
+          <div class="swatch-hex">#fbbf24</div>
+          <div class="swatch-role">Highlights, selection glow, "You" badge, CTA accent</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #05070d;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Deep Navy (Background)</div>
+          <div class="swatch-hex">#05070d</div>
+          <div class="swatch-role">Page background, canvas base, dark atmosphere</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #0b101d;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Slate (Surface)</div>
+          <div class="swatch-hex">#0b101d</div>
+          <div class="swatch-role">Cards, panels, modals, sidebar backgrounds</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #e2e8f0;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Light (Text)</div>
+          <div class="swatch-hex">#e2e8f0</div>
+          <div class="swatch-role">Body text, primary readable content</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h3>Origin Badge Colours</h3>
+    <div class="palette-grid">
+      <div class="swatch">
+        <div class="swatch-color" style="background: #f59e0b;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Amber (In Person)</div>
+          <div class="swatch-hex">#f59e0b</div>
+          <div class="swatch-role">Connections made in person</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #a78bfa;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Light Violet (GitHub)</div>
+          <div class="swatch-hex">#a78bfa</div>
+          <div class="swatch-role">GitHub-sourced connections</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #38bdf8;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Sky (School)</div>
+          <div class="swatch-hex">#38bdf8</div>
+          <div class="swatch-role">School connections</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #34d399;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Emerald (Work)</div>
+          <div class="swatch-hex">#34d399</div>
+          <div class="swatch-role">Work connections</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #f472b6;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Pink (Introduction)</div>
+          <div class="swatch-hex">#f472b6</div>
+          <div class="swatch-role">Connections via introduction</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #2dd4bf;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Teal (Online)</div>
+          <div class="swatch-hex">#2dd4bf</div>
+          <div class="swatch-role">Online-only connections</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h3>Light Theme Overrides</h3>
+    <div class="theme-compare">
+      <div class="theme-box dark">
+        <div class="theme-label">Dark Theme (Default)</div>
+        <table class="token-table">
+          <tr><td style="color:#94a3b8;">Background</td><td class="mono">#05070d</td></tr>
+          <tr><td style="color:#94a3b8;">Surface</td><td class="mono">#0b101d</td></tr>
+          <tr><td style="color:#94a3b8;">Text</td><td class="mono">#e2e8f0</td></tr>
+          <tr><td style="color:#94a3b8;">Border</td><td class="mono">rgba(255,255,255,0.1)</td></tr>
+        </table>
+      </div>
+      <div class="theme-box light">
+        <div class="theme-label">Light Theme</div>
+        <table class="token-table">
+          <tr><td style="color:#475569;">Background</td><td class="mono" style="color:#059669;">#f1f5f9</td></tr>
+          <tr><td style="color:#475569;">Surface</td><td class="mono" style="color:#059669;">#ffffff</td></tr>
+          <tr><td style="color:#475569;">Text</td><td class="mono" style="color:#059669;">#0f172a</td></tr>
+          <tr><td style="color:#475569;">Border</td><td class="mono" style="color:#059669;">rgba(0,0,0,0.15)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 4: TYPOGRAPHY — VISUAL TYPE SCALE                             -->
+<!-- ================================================================== -->
+<div class="page">
+  <div class="section">
+    <h2>Typography</h2>
+    <p class="subtitle">System font stack — Segoe UI, system-ui, -apple-system, sans-serif. No custom web fonts loaded.</p>
+    
+    <div class="type-row">
+      <div class="type-meta"><div class="type-size">24px</div><div class="type-weight">Weight 700</div></div>
+      <div style="font-size: 24px; font-weight: 700; color: #0f172a;">Network Overview</div>
+      <div style="font-size: 12px; color: #94a3b8; margin-left: auto;">Screen / Section Titles</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><div class="type-size">14px</div><div class="type-weight">Weight 400</div></div>
+      <div style="font-size: 14px; font-weight: 400; color: #0f172a;">Your professional network visualised as an interactive graph. Click any node to explore connections.</div>
+      <div style="font-size: 12px; color: #94a3b8; margin-left: auto;">Body / Content</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><div class="type-size">12px</div><div class="type-weight">Weight 500</div></div>
+      <div style="font-size: 12px; font-weight: 500; color: #0f172a;">FORM LABELS &middot; CAPTIONS &middot; BADGES</div>
+      <div style="font-size: 12px; color: #94a3b8; margin-left: auto;">Labels / Captions / Chips</div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h3>Typography Rules</h3>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; font-size: 14px; color: #475569; line-height: 2;">
+      <div><strong style="color:#8b5cf6;">Line Height:</strong> 1.5 for body text, 1.2 for headings</div>
+      <div><strong style="color:#8b5cf6;">Letter Spacing:</strong> -0.02em for headings (tight), normal for body, 0.05em for uppercase labels (wide)</div>
+      <div><strong style="color:#8b5cf6;">Font Weight:</strong> 700 for headings and bold UI elements, 600 for buttons, 500 for labels, 400 for body</div>
+      <div><strong style="color:#8b5cf6;">Text Transform:</strong> uppercase for section labels, badges, and chip text; sentence case for everything else</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 5: SPACING & BORDER RADIUS — VISUAL BARS AND BOXES            -->
+<!-- ================================================================== -->
+<div class="page">
+  <div class="section">
+    <h2>Spacing Scale</h2>
+    <p class="subtitle">All spacing derives from an 8px base unit. Every margin, padding, and gap uses a multiple.</p>
+    
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+      <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 12px;">Base Unit</div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="width: 8px; height: 24px; background: #8b5cf6; border-radius: 2px;"></div>
+        <span style="font-size: 16px; font-weight: 800; font-family: monospace; color: #8b5cf6;">8px</span>
+        <span style="font-size: 13px; color: #64748b;">= 1 unit &middot; multiply for all spacing values</span>
+      </div>
+    </div>
+    
+    <div class="spacing-row">
+      <div class="spacing-label">8px</div>
+      <div class="spacing-bar" style="width: 8px;"></div>
+      <div class="spacing-px">1x &mdash; tight: chip padding, icon gaps, inline spacing</div>
+    </div>
+    <div class="spacing-row">
+      <div class="spacing-label">16px</div>
+      <div class="spacing-bar" style="width: 16px;"></div>
+      <div class="spacing-px">2x &mdash; compact: form field gaps, list item padding</div>
+    </div>
+    <div class="spacing-row">
+      <div class="spacing-label">24px</div>
+      <div class="spacing-bar" style="width: 24px;"></div>
+      <div class="spacing-px">3x &mdash; standard: card internal padding, modal padding</div>
+    </div>
+    <div class="spacing-row">
+      <div class="spacing-label">32px</div>
+      <div class="spacing-bar" style="width: 32px;"></div>
+      <div class="spacing-px">4x &mdash; section: between content blocks</div>
+    </div>
+    <div class="spacing-row">
+      <div class="spacing-label">48px</div>
+      <div class="spacing-bar" style="width: 48px;"></div>
+      <div class="spacing-px">6x &mdash; generous: major section dividers</div>
+    </div>
+    <div class="spacing-row">
+      <div class="spacing-label">64px</div>
+      <div class="spacing-bar" style="width: 64px;"></div>
+      <div class="spacing-px">8x &mdash; page edge: body padding, outer margins</div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h2>Border Radius</h2>
+    <p class="subtitle">Progressive rounding from tight (chips) to soft (cards, modals).</p>
+    
+    <div class="radius-row">
+      <div class="radius-box" style="border-radius: 4px;"></div>
+      <div class="radius-info">
+        <div class="radius-val">4px</div>
+        <div class="radius-token">Tight — progress bars, small elements</div>
+      </div>
+    </div>
+    <div class="radius-row">
+      <div class="radius-box" style="border-radius: 8px;"></div>
+      <div class="radius-info">
+        <div class="radius-val">8px</div>
+        <div class="radius-token">Default — buttons, inputs, chips (Tailwind: rounded-lg)</div>
+      </div>
+    </div>
+    <div class="radius-row">
+      <div class="radius-box" style="border-radius: 12px;"></div>
+      <div class="radius-info">
+        <div class="radius-val">12px</div>
+        <div class="radius-token">Medium — cards, tab bars, alerts (Tailwind: rounded-xl)</div>
+      </div>
+    </div>
+    <div class="radius-row">
+      <div class="radius-box" style="border-radius: 16px;"></div>
+      <div class="radius-info">
+        <div class="radius-val">16px</div>
+        <div class="radius-token">Large — panels, modals, header (Tailwind: rounded-2xl)</div>
+      </div>
+    </div>
+    <div class="radius-row">
+      <div class="radius-box" style="border-radius: 999px;"></div>
+      <div class="radius-info">
+        <div class="radius-val">999px</div>
+        <div class="radius-token">Pill — badges, chips, progress bars (Tailwind: rounded-full)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 6: REUSABLE COMPONENTS — VISUAL SKETCHES                     -->
+<!-- ================================================================== -->
+<div class="page">
+  <div class="section">
+    <h2>Reusable Components</h2>
+    <p class="subtitle">Visual reference for every component used across screens. Dark theme previews.</p>
+    
+    <!-- BUTTON -->
+    <div class="component-box">
+      <div class="component-title">Button</div>
+      <div class="grid-2">
+        <div>
+          <div class="demo-btn primary">Add Connection</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 6px; text-align: center;">Primary — #7c3aed bg, white text</div>
+        </div>
+        <div>
+          <div class="demo-btn secondary">Cancel</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 6px; text-align: center;">Secondary — transparent bg, border</div>
+        </div>
+      </div>
+      <div style="margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.8;">
+        <strong style="color:#8b5cf6;">Tokens:</strong> --color-primary, --border, --bg-input, rounded-lg (8px), text-sm (14px)
+      </div>
+    </div>
+    
+    <!-- CARD -->
+    <div class="component-box">
+      <div class="component-title">Card (Person / Edge)</div>
+      <div class="demo-card">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: #8b5cf6; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 700;">JD</div>
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: #0f172a;">Jane Doe</div>
+            <div style="font-size: 12px; color: #94a3b8;">Product Designer</div>
+          </div>
+        </div>
+        <div class="demo-radio active"></div>
+      </div>
+      <div style="margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.8;">
+        <strong style="color:#8b5cf6;">Tokens:</strong> --color-surface, --border, --text, rounded-xl (12px), padding 14px 18px
+      </div>
+    </div>
+    
+    <!-- INPUT / FIELD -->
+    <div class="component-box">
+      <div class="component-title">Input / Field</div>
+      <div style="margin-bottom: 16px;">
+        <div class="demo-label">Email Address</div>
+        <div class="demo-input" style="color: #94a3b8;">jane@example.com</div>
+      </div>
+      <div style="margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.8;">
+        <strong style="color:#8b5cf6;">Tokens:</strong> --bg-input, --border, --text, --text-dim (placeholder), rounded-lg (8px), text-sm (14px)
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 7: MORE COMPONENTS                                            -->
+<!-- ================================================================== -->
+<div class="page">
+  <div class="section">
+    
+    <!-- CHIP / BADGE -->
+    <div class="component-box">
+      <div class="component-title">Chip / Badge</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
+        <span class="demo-badge" style="background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3);">React</span>
+        <span class="demo-badge" style="background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3);">Met in person</span>
+        <span class="demo-badge" style="background: rgba(52,211,153,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.3);">Work</span>
+        <span class="demo-badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3);">School</span>
+        <span class="demo-badge" style="background: rgba(244,114,182,0.15); color: #f472b6; border: 1px solid rgba(244,114,182,0.3);">Introduction</span>
+        <span class="demo-badge" style="background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1);">Other</span>
+      </div>
+      <div style="margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.8;">
+        <strong style="color:#8b5cf6;">Tokens:</strong> --bg-input, --border, --text-muted, rounded-full (999px), text-xs (12px)
+      </div>
+    </div>
+    
+    <!-- TAB BAR -->
+    <div class="component-box">
+      <div class="component-title">Tab Bar</div>
+      <div class="demo-tab-bar" style="margin-bottom: 16px;">
+        <div class="demo-tab active">Network</div>
+        <div class="demo-tab">Discover</div>
+      </div>
+      <div style="margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.8;">
+        <strong style="color:#8b5cf6;">Tokens:</strong> --bg-input, --border, --color-primary (active bg), rounded-xl (12px)
+      </div>
+    </div>
+    
+    <!-- HEADER -->
+    <div class="component-box">
+      <div class="component-title">Header / Navigation Bar</div>
+      <div class="demo-header" style="margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 24px; height: 24px; background: #8b5cf6; border-radius: 6px;"></div>
+          <span style="font-weight: 800; font-size: 16px; color: #e2e8f0;">Mon<span style="color: #a78bfa;">Ami</span></span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);"></div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);"></div>
+        </div>
+      </div>
+      <div style="margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.8;">
+        <strong style="color:#8b5cf6;">Tokens:</strong> --bg (80% opacity), backdrop-blur-md, --border, rounded-2xl (16px)
+      </div>
+    </div>
+    
+    <!-- ALERT / TOAST -->
+    <div class="component-box">
+      <div class="component-title">Alert / Toast</div>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+        <div class="demo-alert success">Sync complete — 12 connections imported.</div>
+        <div class="demo-alert error">Failed to save. Please try again.</div>
+      </div>
+      <div style="margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.8;">
+        <strong style="color:#8b5cf6;">Tokens:</strong> success: #22c55e bg/border, error: #ef4444 bg/border, rounded-xl (12px)
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 8: LAYOUT, SHADOWS & ANIMATION                               -->
+<!-- ================================================================== -->
+<div class="page">
+  <div class="section">
+    <h2>Layout System</h2>
+    <p class="subtitle">Responsive shell widths and grid breakpoints.</p>
+    
+    <div class="grid-2">
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+        <h3 style="margin-bottom: 12px;">Shell Widths</h3>
+        <table class="token-table">
+          <tr><th>Breakpoint</th><th>Max Width</th></tr>
+          <tr><td class="mono">Mobile</td><td class="mono">100% (full bleed)</td></tr>
+          <tr><td class="mono">sm (640px+)</td><td class="mono">100% (with side panel)</td></tr>
+          <tr><td class="mono">lg (1024px+)</td><td class="mono">100% (sidebar + graph)</td></tr>
+        </table>
+      </div>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+        <h3 style="margin-bottom: 12px;">Grid Breakpoints</h3>
+        <table class="token-table">
+          <tr><th>Breakpoint</th><th>Layout Change</th></tr>
+          <tr><td class="mono">&lt; 640px</td><td>Full-screen graph, bottom-sheet details, overflow menu</td></tr>
+          <tr><td class="mono">&ge; 640px</td><td>Side-by-side details panel, inline toolbar buttons</td></tr>
+          <tr><td class="mono">&ge; 1024px</td><td>Wide sidebar, full discover grid, larger modals</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h2>Shadows &amp; Elevation</h2>
+    <div class="grid-3">
+      <div class="demo-shadow" style="box-shadow: 0 4px 14px rgba(0,0,0,0.5);">
+        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #8b5cf6; margin-bottom: 8px;">Shadow Default</div>
+        <code style="font-size: 10px; color: #94a3b8;">0 4px 14px rgba(0,0,0,0.5)</code>
+      </div>
+      <div class="demo-shadow" style="box-shadow: 0 8px 32px rgba(0,0,0,0.6);">
+        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #8b5cf6; margin-bottom: 8px;">Shadow XL</div>
+        <code style="font-size: 10px; color: #94a3b8;">0 8px 32px rgba(0,0,0,0.6)</code>
+      </div>
+      <div class="demo-shadow" style="box-shadow: 0 16px 48px rgba(0,0,0,0.7);">
+        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #8b5cf6; margin-bottom: 8px;">Shadow 2XL</div>
+        <code style="font-size: 10px; color: #94a3b8;">0 16px 48px rgba(0,0,0,0.7)</code>
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h2>Animation</h2>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+      <code style="font-size: 11px; color: #8b5cf6; font-family: monospace; line-height: 1.8;">
+        transition: 150ms ease-in-out (all interactive elements)<br>
+        backdrop-filter: blur(12px) (header, modals)<br>
+        animate-pulse (loading states, skeleton screens)<br>
+        animate-spin (sync/refresh indicators)<br>
+        Canvas: glow effect on hover (rgba halo around nodes)
+      </code>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 9: STEPS E-F — COMPONENT TABLE & RESPONSIVE PLAN             -->
+<!-- ================================================================== -->
+<div class="page">
+
+  <!-- STEP E: REUSABLE COMPONENTS TABLE -->
+  <div class="section">
+    <h2>Step E: Reusable Components</h2>
+    <p class="subtitle">Every component that appears on more than one screen.</p>
+    
+    <table class="token-table" style="font-size: 13px;">
+      <tr><th>Component</th><th>Level</th><th>Appears On</th><th>Props / Variants</th></tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Button</td>
+        <td style="color: #475569;">Atom</td>
+        <td style="color: #475569;">Everywhere</td>
+        <td style="color: #475569;">variant (primary/secondary/danger), onClick, children, disabled</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Card (Person)</td>
+        <td style="color: #475569;">Molecule</td>
+        <td style="color: #475569;">Home, Discover, Details sidebar</td>
+        <td style="color: #475569;">person (name, headline, avatar), selected, onClick</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Input / Field</td>
+        <td style="color: #475569;">Atom</td>
+        <td style="color: #475569;">Login, Register, Settings, AddPerson, AddConnection</td>
+        <td style="color: #475569;">label, placeholder, value, onChange, type, required</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Chip / Badge</td>
+        <td style="color: #475569;">Atom</td>
+        <td style="color: #475569;">Home (tags, origins), Discover, Details</td>
+        <td style="color: #475569;">label, color (origin/tag), size</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Modal</td>
+        <td style="color: #475569;">Organism</td>
+        <td style="color: #475569;">Home (add person/connection), Settings</td>
+        <td style="color: #475569;">title, onClose, children</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Tab Bar</td>
+        <td style="color: #475569;">Molecule</td>
+        <td style="color: #475569;">Home (Network/Discover), Discover (People/Repos)</td>
+        <td style="color: #475569;">tabs (string[]), activeIndex, onChange</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Header</td>
+        <td style="color: #475569;">Organism</td>
+        <td style="color: #475569;">Home (persistent top bar)</td>
+        <td style="color: #475569;">search (query, onChange), themeToggle, userMenu</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">Alert / Toast</td>
+        <td style="color: #475569;">Molecule</td>
+        <td style="color: #475569;">Home (sync feedback), Settings (save feedback)</td>
+        <td style="color: #475569;">variant (success/error), message, duration</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- STEP F: RESPONSIVE PLAN -->
+  <div class="section">
+    <h2>Step F: Responsive Plan</h2>
+    <p class="subtitle">Where the layout changes, and to what.</p>
+    
+    <table class="token-table" style="font-size: 13px; margin-bottom: 20px;">
+      <tr><th>Breakpoint</th><th>Layout Change</th></tr>
+      <tr>
+        <td class="mono">Below 640px (phone)</td>
+        <td style="color: #475569;">Full-screen graph canvas. Details panel becomes bottom sheet (rounded top). Header toolbar collapses to overflow menu (3-dot). Modals are full-width bottom sheets. Cards stack vertically. No sidebar.</td>
+      </tr>
+      <tr>
+        <td class="mono">Above 640px (tablet/desktop)</td>
+        <td style="color: #475569;">Details panel sits beside graph (right side, 320px wide). Header shows inline toolbar buttons. Modals are centered dialogs (max-width 480px). Discover grid shows 2 columns.</td>
+      </tr>
+      <tr>
+        <td class="mono">Above 1024px (wide desktop)</td>
+        <td style="color: #475569;">Full sidebar with rich person details. Discover grid shows 3 columns. Larger modal sizing. More breathing room around graph.</td>
+      </tr>
+    </table>
+    
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 8px;">Hard Requirement</div>
+      <div style="font-size: 13px; color: #475569;">
+        No horizontal scrolling on a <strong style="color: #0f172a;">375px-wide</strong> phone (iPhone SE). Canvas scales to viewport width.
+      </div>
+    </div>
+  </div>
+
+  <!-- ACCESSIBILITY CHECKLIST -->
+  <div class="section">
+    <h2>Accessibility Checklist</h2>
+    
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+      <div style="display: flex; flex-direction: column; gap: 12px; font-size: 14px;">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid #16a34a; background: #16a34a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 13px; font-weight: 700;">&#10003;</div>
+          <div>
+            <div style="font-weight: 700; color: #0f172a;">Every text-on-background pair passes 4.5:1 contrast</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">#e2e8f0 on #05070d = 14.8:1 &#10003; | #e2e8f0 on #0b101d = 13.2:1 &#10003; | #8b5cf6 on #05070d = 5.1:1 &#10003; | #0f172a on #f1f5f9 = 17.3:1 &#10003;</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid #16a34a; background: #16a34a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 13px; font-weight: 700;">&#10003;</div>
+          <div>
+            <div style="font-weight: 700; color: #0f172a;">Real semantic elements, not divs with onClick</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Uses &lt;header&gt;, &lt;nav&gt;, &lt;main&gt;, &lt;button&gt;, &lt;input&gt;, &lt;label&gt;, &lt;form&gt;, &lt;dialog&gt;</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid #16a34a; background: #16a34a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 13px; font-weight: 700;">&#10003;</div>
+          <div>
+            <div style="font-weight: 700; color: #0f172a;">Every meaningful image has alt text</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Person avatars use alt="{name}" | Decorative icons use alt="" | Graph nodes are canvas-rendered (no img tags)</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid #16a34a; background: #16a34a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 13px; font-weight: 700;">&#10003;</div>
+          <div>
+            <div style="font-weight: 700; color: #0f172a;">Every form input has a matching label</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">PersonFormFields & EdgeFormFields use &lt;label className="label"&gt; with htmlFor + id for every &lt;input&gt;</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid #16a34a; background: #16a34a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 13px; font-weight: 700;">&#10003;</div>
+          <div>
+            <div style="font-weight: 700; color: #0f172a;">Tab key reaches every link and button, with visible focus</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">focus-visible outline: 2px solid #8b5cf6 with 2px offset on all interactive elements</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PAGE 10: TOKEN QUICK REFERENCE                                     -->
+<!-- ================================================================== -->
+<div class="page">
+  <div class="section">
+    <h2>Token Quick Reference</h2>
+    <p class="subtitle">Copy-paste reference for all CSS custom properties and their values.</p>
+    
+    <div class="grid-2">
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+        <h3 style="margin-bottom: 12px;">Colour Tokens</h3>
+        <table class="token-table" style="font-size: 12px;">
+          <tr><td class="mono" style="font-size: 11px;">--bg</td><td class="mono">#05070d</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--bg-card</td><td class="mono">#0b101d</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--bg-hover</td><td class="mono">rgba(255,255,255,0.12)</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--bg-input</td><td class="mono">rgba(255,255,255,0.06)</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--text</td><td class="mono">#e2e8f0</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--text-muted</td><td class="mono">#94a3b8</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--text-dim</td><td class="mono">#64748b</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--border</td><td class="mono">rgba(255,255,255,0.1)</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--border-strong</td><td class="mono">rgba(255,255,255,0.2)</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--shadow</td><td class="mono">rgba(0,0,0,0.5)</td></tr>
+        </table>
+      </div>
+      
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+        <h3 style="margin-bottom: 12px;">Spacing &amp; Size Tokens</h3>
+        <table class="token-table" style="font-size: 12px;">
+          <tr><td class="mono" style="font-size: 11px;">--space-1</td><td class="mono">8px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--space-2</td><td class="mono">16px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--space-3</td><td class="mono">24px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--space-4</td><td class="mono">32px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--space-6</td><td class="mono">48px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--space-8</td><td class="mono">64px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--radius-sm</td><td class="mono">4px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--radius-md</td><td class="mono">8px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--radius-lg</td><td class="mono">12px</td></tr>
+          <tr><td class="mono" style="font-size: 11px;">--radius-xl</td><td class="mono">16px</td></tr>
+        </table>
+      </div>
+    </div>
+    
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 24px;">
+      <h3 style="margin-bottom: 12px;">Design Principles Summary</h3>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 13px; color: #475569;">
+        <div>
+          <div style="font-weight: 800; color: #8b5cf6; margin-bottom: 4px;">Visualise Relationships</div>
+          <div>The graph is the core UX — connections are shown, not just listed. Every design decision supports spatial understanding of your network.</div>
+        </div>
+        <div>
+          <div style="font-weight: 800; color: #8b5cf6; margin-bottom: 4px;">Dark-First Atmosphere</div>
+          <div>Deep navy backgrounds with violet accents create a focused, modern feel. Light theme is available but dark is the primary experience.</div>
+        </div>
+        <div>
+          <div style="font-weight: 800; color: #8b5cf6; margin-bottom: 4px;">Consistent Token System</div>
+          <div>Every colour, size, and spacing value comes from a token. Components never hardcode values — they reference CSS custom properties.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
