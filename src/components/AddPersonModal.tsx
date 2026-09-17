@@ -1,3 +1,4 @@
+// Add-member modal, supports Discover prefill.
 "use client";
 
 import { useState } from "react";
@@ -10,7 +11,7 @@ import {
 } from "./PersonFormFields";
 import type { Person, RecommendedPerson } from "@/lib/model";
 
-/** Convert a RecommendedPerson into form state for pre-filling. */
+// Suggestion -> form.
 function recommendationToForm(r: RecommendedPerson): PersonFormState {
   return {
     name: r.name,

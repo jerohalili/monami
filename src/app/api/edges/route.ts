@@ -1,5 +1,4 @@
-// GET /api/edges — list all edges.
-// POST /api/edges — create a new edge between two people.
+// Ties: origin, strength 1-3, context.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -10,6 +9,8 @@ import { requireUserId } from "@/lib/auth-guard";
 function parseOrigin(v: unknown): Origin | null {
   return typeof v === "string" && (ORIGIN_KEYS as string[]).includes(v) ? (v as Origin) : null;
 }
+// Same parser, circle language. Type-only alias below.
+type TieOrigin = Origin;
 
 export async function GET() {
   try {
@@ -20,7 +21,7 @@ export async function GET() {
     });
     return NextResponse.json({ edges: edges.map(edgeDTO) });
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to view your ties" }, { status: 401 });
   }
 }
 
@@ -30,13 +31,13 @@ export async function POST(req: NextRequest) {
 
     const b = await req.json().catch(() => null);
     if (!b || typeof b !== "object") {
-      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+      return NextResponse.json({ error: "Couldn't read that tie — pick two people and an origin" }, { status: 400 });
     }
     const r = b as Record<string, unknown>;
     const sourceId = typeof r.sourceId === "string" ? r.sourceId : "";
     const targetId = typeof r.targetId === "string" ? r.targetId : "";
     if (!sourceId || !targetId) {
-      return NextResponse.json({ error: "Both people are required" }, { status: 400 });
+      return NextResponse.json({ error: "A tie needs two people — who does it connect?" }, { status: 400 });
     }
     if (sourceId === targetId) {
       return NextResponse.json({ error: "A person cannot be connected to themselves" }, { status: 400 });
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
         db.person.findFirst({ where: { id: targetId, userId } }),
       ]);
       if (!source || !target) {
-        return NextResponse.json({ error: "Person not found" }, { status: 404 });
+        return NextResponse.json({ error: "One of those circle members is gone — reload and try again" }, { status: 404 });
       }
       const edge = await db.edge.create({
         data: {
@@ -69,9 +70,9 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json(edgeDTO(edge), { status: 201 });
     } catch {
-      return NextResponse.json({ error: "These two are already connected" }, { status: 409 });
+      return NextResponse.json({ error: "Those two already have a tie — edit it instead" }, { status: 409 });
     }
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to add a tie" }, { status: 401 });
   }
 }

@@ -1,12 +1,9 @@
-// GET /api/recommendations — multi-signal people recommendations.
-// Combines: skills/interests overlap, company/location, GitHub contributors,
-// GitHub starred repos, GitHub followers/following.
-// Improvements: skill normalization, recency weighting, diversity cap.
+// People recs: skills, company/city, contributors.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireUserId } from "@/lib/auth-guard";
-import { autoAvatarUrl, overlap } from "@/lib/model";
+import { requireUserId, UnauthorizedError } from "@/lib/auth-guard";
+import { autoAvatarUrl, sharedCircleTraits } from "@/lib/model";
 import { normalizeSkills, extractSkillsFromRepos } from "@/lib/skills";
 import {
   getGitHubToken,
@@ -123,9 +120,7 @@ export async function GET() {
       return c;
     };
 
-    // --- Signal 1: Skills & interests overlap with "me" node ---
-    // Checks people in the DB who aren't directly connected to "you".
-    // Recency weighting: recently updated profiles get a small freshness boost.
+    // Signal 1: skills/interests vs You-node.
     if (meNode) {
       const myConnections = adjacency.get(meNode.id) ?? new Set();
       for (const person of existingPeople) {
@@ -134,8 +129,8 @@ export async function GET() {
         const personSkills = normalizeSkills(Array.isArray(person.skills) ? (person.skills as string[]) : []);
         const personInterests = normalizeSkills(Array.isArray(person.interests) ? (person.interests as string[]) : []);
 
-        const sharedSkills = overlap(mySkills, personSkills);
-        const sharedInterests = overlap(myInterests, personInterests);
+        const sharedSkills = sharedCircleTraits(mySkills, personSkills);
+        const sharedInterests = sharedCircleTraits(myInterests, personInterests);
 
         if (sharedSkills.length > 0 || sharedInterests.length > 0) {
           // Recency boost: profiles updated in last 30 days get 1.1x
@@ -343,9 +338,7 @@ export async function GET() {
       }
     }
 
-    // --- Step 6: Enrich GitHub-only candidates ---
-    // For candidates with a githubLogin, merge DB profile data and fetch
-    // GitHub profiles to enable skills/interests/company/location matching.
+    // Enrich GitHub-only candidates.
 
     const loginToPerson = new Map<string, (typeof existingPeople)[number]>();
     for (const p of existingPeople) {
@@ -418,8 +411,8 @@ export async function GET() {
       const normalizedInterests = normalizeSkills(c.interests);
 
       if (normalizedSkills.length > 0 || normalizedInterests.length > 0) {
-        const sharedSkills = overlap(mySkills, normalizedSkills);
-        const sharedInterests = overlap(myInterests, normalizedInterests);
+        const sharedSkills = sharedCircleTraits(mySkills, normalizedSkills);
+        const sharedInterests = sharedCircleTraits(myInterests, normalizedInterests);
 
         if (sharedSkills.length > 0 && !c.reasonDetails.sharedSkills) {
           c.score += sharedSkills.length;
@@ -476,7 +469,9 @@ export async function GET() {
 
     return NextResponse.json({ recommendations: results });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
+    // Real DB/GitHub blowups only.
+    if (e instanceof UnauthorizedError) throw e;
+    const msg = e instanceof Error ? e.message : "Couldn't score new ties — try reopening Discover";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -1,4 +1,4 @@
-// Relationship origin types with display labels and colors for the graph.
+// Tie origins + graph colors. Amber = in-person, purple = github_indirect.
 
 export const ORIGINS = {
   in_person: { label: "Met in person", color: "#f59e0b" },
@@ -18,7 +18,7 @@ export function isOrigin(v: unknown): v is Origin {
   return typeof v === "string" && ORIGIN_KEYS.includes(v as Origin);
 }
 
-// --- Domain types (API response shapes) ---
+// Person = node, Relationship = tie (strength 1-3).
 
 export interface Person {
   id: string;
@@ -54,7 +54,8 @@ export interface GraphPayload {
   edges: Relationship[];
 }
 
-// --- Utility functions ---
+// Stable node colors per name.
+// TODO(jero): pull palettes into globals.css vars.
 
 const DARK_NODE_PALETTE = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
@@ -66,7 +67,7 @@ const LIGHT_NODE_PALETTE = [
   "#0891b2", "#ea580c", "#65a30d", "#ca8a04", "#0d9488",
 ];
 
-/** Deterministic color from a name string. */
+// Name -> stable palette color.
 export function colorForName(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -75,17 +76,18 @@ export function colorForName(name: string): string {
   return palette[h % palette.length];
 }
 
-/** Node fill color from palette hash. */
+// Constellation alias for canvas call sites.
 export function nodeColor(name: string): string {
   return colorForName(name);
 }
+export const constellationColorFor = colorForName;
 
-/** Auto-generated avatar URL using Dicebear notionists style. */
+// DiceBear fallback, seeded by name.
 export function autoAvatarUrl(name: string): string {
   return `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=334155`;
 }
 
-/** First two initials from a name. */
+// "Ada Lovelace" -> "AL".
 export function initialsOf(name: string): string {
   return name
     .split(/\s+/)
@@ -94,8 +96,9 @@ export function initialsOf(name: string): string {
     .map((p) => p[0]!.toUpperCase())
     .join("");
 }
+export const monamiInitials = initialsOf;
 
-/** Convert hex color to rgba string. */
+// hex -> rgba for canvas glows.
 export function hexToRgba(hex: string, alpha: number): string {
   const m = hex.replace("#", "");
   const r = parseInt(m.slice(0, 2), 16);
@@ -104,13 +107,13 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-/** Find overlapping strings between two arrays (case-insensitive). */
-export function overlap(a: string[], b: string[]): string[] {
+// Shared traits, case-insensitive.
+export function sharedCircleTraits(a: string[], b: string[]): string[] {
   const lower = new Set(b.map((s) => s.toLowerCase()));
   return a.filter((s) => lower.has(s.toLowerCase()));
 }
-
-// --- Recommendation types ---
+// Legacy alias.
+export const overlap = sharedCircleTraits;
 
 export interface RecommendedPerson {
   name: string;

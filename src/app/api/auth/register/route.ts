@@ -1,3 +1,4 @@
+// Email signup.
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
@@ -6,7 +7,7 @@ import { optionalString } from "@/lib/dto";
 export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null);
   if (!b || typeof b !== "object") {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    return NextResponse.json({ error: "Couldn't read that signup — try again" }, { status: 400 });
   }
   const r = b as Record<string, unknown>;
 
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
   const password = typeof r.password === "string" ? r.password : null;
 
   if (!email || !password) {
-    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    return NextResponse.json({ error: "We need both an email and password to start your circle" }, { status: 400 });
   }
 
   if (password.length < 6) {

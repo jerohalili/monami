@@ -1,3 +1,4 @@
+// NextAuth: GitHub + credentials, JWT sessions.
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Credentials from "next-auth/providers/credentials";
@@ -45,15 +46,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (account?.provider === "github" && user.email) {
         const githubId = account.providerAccountId;
 
-        // Check if user already exists with this GitHub ID
+        // Seen this GitHub before?
         let existingUser = await db.user.findUnique({ where: { githubId } });
 
         if (!existingUser) {
-          // Check if user exists with this email
+          // Same email, new GitHub?
           existingUser = await db.user.findUnique({ where: { email: user.email } });
 
           if (existingUser) {
-            // Link GitHub account to existing user
+            // Link it.
             existingUser = await db.user.update({
               where: { id: existingUser.id },
               data: {
@@ -62,7 +63,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               },
             });
           } else {
-            // Create new user from GitHub
+            // Brand new circle.
             existingUser = await db.user.create({
               data: {
                 email: user.email,
@@ -74,7 +75,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
         }
 
-        // Store GitHub access token for API calls
+        // Save token for syncs.
         if (account.access_token) {
           await db.user.update({
             where: { id: existingUser.id },
@@ -87,7 +88,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
         }
 
-        // Update user ID for JWT
+        // Thread db id through.
         user.id = existingUser.id;
       }
       return true;
@@ -96,7 +97,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
       }
-      // Include githubId from account on GitHub sign-in
+      // Carry githubId on token.
       if (account?.provider === "github" && user?.id) {
         const dbUser = await db.user.findUnique({
           where: { id: user.id },

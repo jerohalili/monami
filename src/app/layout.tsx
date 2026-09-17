@@ -1,3 +1,4 @@
+// Root layout, theme boots before paint to avoid flash.
 import type { Metadata, Viewport } from "next";
 import Providers from "@/components/Providers";
 import "./globals.css";

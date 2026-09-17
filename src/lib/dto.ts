@@ -1,5 +1,4 @@
-// Prisma row -> API DTO transformers.
-// Keeps API consumers decoupled from Prisma column shapes.
+// Prisma row -> clean DTO. Wren seed = You-node fallback avatar.
 
 import type { Prisma } from "@prisma/client";
 import { autoAvatarUrl, isOrigin, type Origin, type Person, type Relationship } from "./model";
@@ -7,7 +6,7 @@ import { autoAvatarUrl, isOrigin, type Origin, type Person, type Relationship } 
 type PersonRow = Prisma.PersonGetPayload<object>;
 type EdgeRow = Prisma.EdgeGetPayload<object>;
 
-// --- Internal helpers ---
+// Json -> string[] guard.
 
 function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -23,16 +22,16 @@ function toRecord(value: unknown): Record<string, string> {
   return out;
 }
 
-// --- Public input helpers (used by API route handlers) ---
+// Form inputs: comma string or string[].
 
-/** Trim a string or return null if not a non-empty string. */
 export function optionalString(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const t = v.trim();
   return t ? t : null;
 }
+// Alias: trim empty to null.
+export const trimToNull = optionalString;
 
-/** Parse a comma-separated string or array into a clean string[] */
 export function toStringArrayInput(value: unknown): string[] {
   if (Array.isArray(value)) return toStringArray(value);
   if (typeof value === "string") {
@@ -40,13 +39,12 @@ export function toStringArrayInput(value: unknown): string[] {
   }
   return [];
 }
+export const splitCircleListInput = toStringArrayInput;
 
-/** Parse a links object from the request body. */
 export function toLinksInput(value: unknown): Record<string, string> {
   return toRecord(value);
 }
-
-// --- DTO mappers ---
+export const parseCircleLinks = toLinksInput;
 
 export function personDTO(p: PersonRow): Person {
   return {
@@ -67,6 +65,8 @@ export function personDTO(p: PersonRow): Person {
   };
 }
 
+// Edge row -> tie, falls back to "other".
+export const toCircleMember = personDTO;
 export function edgeDTO(e: EdgeRow): Relationship {
   return {
     id: e.id,
@@ -80,3 +80,4 @@ export function edgeDTO(e: EdgeRow): Relationship {
     metAt: e.metAt ? e.metAt.toISOString() : null,
   };
 }
+export const toTie = edgeDTO;

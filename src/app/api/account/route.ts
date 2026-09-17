@@ -1,6 +1,4 @@
-// GET  /api/account — return account info (hasPassword, githubLinked).
-// PATCH /api/account — update email or password.
-// DELETE /api/account — delete the authenticated user and all associated data.
+// Account info, email/password update, delete.
 
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";

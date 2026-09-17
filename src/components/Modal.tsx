@@ -1,4 +1,4 @@
-// Generic modal wrapper with backdrop, escape-to-close, and mobile bottom-sheet layout.
+// Bottom-sheet on phones, card on desktop.
 
 "use client";
 

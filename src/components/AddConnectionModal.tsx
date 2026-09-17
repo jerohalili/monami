@@ -1,5 +1,4 @@
-// Add connection modal: searchable person picker + edge form.
-// Select two people from a scrollable list, then fill in relationship details.
+// Add-tie modal with person picker.
 
 "use client";
 
@@ -34,8 +33,10 @@ export default function AddConnectionModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Alpha sort so picker feels stable.
   const sorted = useMemo(() => [...people].sort((a, b) => a.name.localeCompare(b.name)), [people]);
 
+  // Picker searches name, headline, skills, tags.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return sorted;
@@ -48,6 +49,7 @@ export default function AddConnectionModal({
     });
   }, [sorted, query]);
 
+  // Max two picked, tap again to unpick.
   const toggle = (id: string) => {
     setError(null);
     setSelectedIds((prev) => {

@@ -1,3 +1,4 @@
+// Session scope for whole app.
 "use client";
 
 import { SessionProvider } from "next-auth/react";

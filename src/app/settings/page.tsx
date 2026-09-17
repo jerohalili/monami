@@ -1,3 +1,4 @@
+// Settings: email, password, GitHub link, delete circle.
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
@@ -12,30 +13,30 @@ export default function SettingsPage() {
   const confirm = useConfirm();
   const [deleting, setDeleting] = useState(false);
 
-  // Account info from API
+  // Linked-account flags.
   const [hasPassword, setHasPassword] = useState(false);
   const [githubLinked, setGithubLinked] = useState(false);
 
-  // Email form
+  // Email change form.
   const [emailCurrentPw, setEmailCurrentPw] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [emailMsg, setEmailMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [emailLoading, setEmailLoading] = useState(false);
 
-  // Password form
+  // Password change form.
   const [pwCurrentPw, setPwCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [newPwConfirm, setNewPwConfirm] = useState("");
   const [pwMsg, setPwMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [pwLoading, setPwLoading] = useState(false);
 
-  // GitHub
+  // GitHub link state.
   const [ghLoading, setGhLoading] = useState(false);
   const [ghMsg, setGhMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const user = session?.user;
 
-  // Fetch account info on mount
+  // Load flags once.
   useEffect(() => {
     fetch("/api/account")
       .then((r) => r.json())

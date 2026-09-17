@@ -1,3 +1,4 @@
+// Register, then auto-sign-in.
 "use client";
 
 import { signIn } from "next-auth/react";
@@ -48,7 +49,7 @@ export default function RegisterPage() {
         router.refresh();
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("Couldn't create your circle — check connection and try again.");
       setLoading(false);
     }
   };

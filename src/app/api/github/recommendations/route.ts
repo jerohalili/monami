@@ -1,4 +1,4 @@
-// GET /api/github/recommendations — fetch people and repo recommendations.
+// Repo recs, scored by circle stars.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -13,7 +13,6 @@ import {
   type GitHubUser,
 } from "@/lib/github";
 import { normalizeSkills } from "@/lib/skills";
-import { overlap } from "@/lib/model";
 
 interface RecommendedPerson {
   login: string;

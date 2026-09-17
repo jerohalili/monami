@@ -1,5 +1,4 @@
-// Force-directed graph canvas rendered with react-force-graph-2d.
-// Handles node/link painting, hover tooltips, selection highlighting, and zoom controls.
+// Constellation canvas. Ties colored by origin, dashed = weak.
 
 "use client";
 
@@ -19,15 +18,14 @@ import {
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
-// Cubic in-out easing: slow start → fast middle → slow end.
-function cubicInOut(t: number): number {
+// Camera easing.
+function monamiEaseInOut(t: number): number {
   return t < 0.5
     ? 4 * t * t * t
     : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-// Gentle reheat: sets alpha to 0.15 instead of 1.0 so nodes drift smoothly
-// instead of teleporting. Falls back to full reheat if internals are unavailable.
+// Gentle reheat so nodes drift, not teleport.
 function gentleReheat(g: ForceGraphMethods) {
   const sim = (g as any)?.forceGraph?.state?.forceLayout;
   if (sim) {
@@ -36,8 +34,6 @@ function gentleReheat(g: ForceGraphMethods) {
     g.d3ReheatSimulation();
   }
 }
-
-// --- Types ---
 
 export interface GraphApi {
   zoomIn: (ms?: number) => void;
@@ -53,12 +49,11 @@ interface GNode extends Person {
   fy?: number;
 }
 
-/** Extract the string id from a node/link ref (force-graph mutates these). */
-function lid(x: unknown): string {
+// Normalize link refs (string or {id}).
+function monamiLinkId(x: unknown): string {
   return typeof x === "object" && x !== null ? (x as { id: string }).id : String(x);
 }
-
-// --- Component ---
+const lid = monamiLinkId;
 
 export default function GraphView({
   data,
@@ -111,7 +106,7 @@ export default function GraphView({
   const prevNodeCountRef = useRef<number | null>(null);
   const initialFitRafRef = useRef<number | null>(null);
 
-  // Track container size.
+  // Container size.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -121,7 +116,7 @@ export default function GraphView({
     return () => ro.disconnect();
   }, []);
 
-  // Expose zoom/fit/camera methods via apiRef.
+  // Zoom/fit API.
   useEffect(() => {
     apiRef.current = {
       zoomIn: (t) => { zoomBy(1.3, t ?? 300); },
@@ -131,7 +126,7 @@ export default function GraphView({
     return () => { apiRef.current = null; };
   }, [apiRef]);
 
-  // Build graph data. Persistent node objects so force graph keeps positions.
+  // Persistent nodes so positions stick.
   const graphData = useMemo(() => {
     const degree: Record<string, number> = {};
     for (const e of data.edges) {
@@ -144,13 +139,11 @@ export default function GraphView({
       if (pendingPlacement && p.id === pendingPlacement.id && !map.has(p.id)) continue;
       let existing = map.get(p.id);
       if (existing) {
-        // Skip metadata update for the actively dragged node — the library is
-        // continuously setting fx/fy and Object.assign would overwrite them,
-        // causing the node to snap back.
+        // Skip dragged node, else it snaps back.
         if (!(isDraggingRef.current && existing.id === dragNodeIdRef.current)) {
           Object.assign(existing, { ...p, degree: degree[p.id] ?? 0 });
         }
-        // Re-apply pin if this node was just placed (Object.assign overwrites fx/fy)
+        // Re-apply pin.
         const pin = pendingPinRef.current;
         if (pin && pin.id === p.id) {
           existing.fx = pin.x;
@@ -158,8 +151,7 @@ export default function GraphView({
         }
       } else {
         existing = { ...p, degree: degree[p.id] ?? 0 } as GNode;
-        // Apply pending pin for newly placed nodes so they appear at the
-        // click position instead of drifting to d3-force's default.
+        // Pin new nodes to click pos.
         const pin = pendingPinRef.current;
         if (pin && pin.id === p.id) {
           existing.fx = pin.x;
@@ -170,7 +162,7 @@ export default function GraphView({
       }
       nodes.push(existing);
     }
-    // Garbage-collect removed nodes and links from maps
+    // Drop removed nodes/links.
     for (const id of map.keys()) {
       if (!data.people.find((p) => p.id === id)) map.delete(id);
     }
@@ -179,15 +171,13 @@ export default function GraphView({
         linkMapRef.current.delete(key);
       }
     }
-    // Build links: reuse existing objects to preserve identity across renders
+    // Reuse link objects.
     const links: (Relationship & { source: string; target: string })[] = [];
     for (const e of data.edges) {
       const key = `${e.sourceId}->${e.targetId}`;
       let existing = linkMapRef.current.get(key);
       if (existing) {
-        // Only update metadata — do NOT overwrite source/target, which the
-        // force-graph library resolves from string IDs to node objects with
-        // x/y coordinates. Overwriting them breaks line rendering.
+        // Metadata only, keep source/target.
         Object.assign(existing, {
           id: e.id,
           origin: e.origin,
@@ -205,24 +195,16 @@ export default function GraphView({
       }
       links.push(existing);
     }
-    // Cache: return the same object reference when node IDs and link topology
-    // are unchanged.  react-force-graph reinitializes on every new reference,
-    // so preserving identity here is the primary defence against jolts on
-    // metadata-only edits.
+    // Same ref if topology unchanged, avoids jolts.
     const nodeSig = nodes.map((n) => n.id).sort().join(",");
     const linkSig = links.map((l) => `${lid(l.source)}->${lid(l.target)}`).sort().join(",");
     const prev = graphDataRef.current;
     if (nodeSig === prev._nodeSig && linkSig === prev._linkSig) return prev;
-    // Link-only change (edge added/removed, no node changes):
-    // Mutate in-place and return same reference so react-force-graph
-    // doesn't detect a prop change and doesn't trigger its internal alpha(1) reheat.
+    // Link-only change: mutate in place, no reheat.
     if (nodeSig === prev._nodeSig) {
       prev.links = links;
       prev._linkSig = linkSig;
-      // Resolve new links' string source/target to node objects.
-      // Normally the library's update() → linkForce.links() does this,
-      // but we skip update() to avoid reheat. Unresolved strings cause
-      // paintCustomLink to bail out (source.x is undefined).
+      // Resolve string refs to nodes.
       const nodeById = new Map(nodes.map(n => [n.id, n]));
       for (const l of links) {
         if (typeof l.source === "string") {
@@ -241,10 +223,7 @@ export default function GraphView({
     return result;
   }, [data, pendingPlacement]);
 
-  // Flag a deferred fit when new nodes are added or removed.
-  // On increase, the fit fires on onEngineStop so the simulation has settled.
-  // On decrease, we also fire fit immediately so the view centers before pins
-  // release and nodes drift off-screen.
+  // Deferred fit on node add/remove.
   const prevCount = useRef(graphData.nodes.length);
   const didInitialFit = useRef(false);
   const didMarkEngineReady = useRef(false);
@@ -263,7 +242,7 @@ export default function GraphView({
     prevCount.current = graphData.nodes.length;
   }, [graphData]);
 
-  // Clean up placement-blocking timer on unmount.
+  // Cleanup timers.
   useEffect(() => {
     return () => {
       if (placingTimerRef.current) clearTimeout(placingTimerRef.current);
@@ -271,11 +250,7 @@ export default function GraphView({
     };
   }, []);
 
-  // Unpin placed node after physics settles.
-  // Uses a ref-based timer so it survives re-renders — the cleanup MUST fire
-  // even if graphData changes again before the timeout (e.g. a data refresh
-  // during the unpin window).  Previous impl used effect cleanup which could
-  // cancel the timer and permanently freeze the node.
+  // Unpin after settle, ref timer survives re-renders.
   useEffect(() => {
     const pin = pendingPinRef.current;
     if (!pin) return;
@@ -288,13 +263,12 @@ export default function GraphView({
     }, 200);
   }, [graphData]);
 
-  // Configure charge force: weaker repulsion for unconnected nodes.
-  // Add center attraction to keep nodes from drifting too far from the "You" node.
+  // Charge + center forces.
   useEffect(() => {
     const g = fgRef.current;
     if (!g) return;
 
-    // Charge (repulsion): weaker for unconnected nodes
+    // Weaker repulsion when unconnected.
     const charge = g.d3Force("charge");
     if (charge) {
       charge.strength((n: object) => {
@@ -303,12 +277,7 @@ export default function GraphView({
       });
     }
 
-    // Center attraction: pulls nodes toward the "You" node
-    // Stronger pull for unconnected nodes to keep them near the cluster
-    // NOTE: 'x'/'y' aren't registered by default (only 'link'/'charge'/'center' are),
-    // so d3Force("x")/d3Force("y") always returned undefined and this block was a
-    // silent no-op — the "keep unconnected nodes near the cluster" fix never actually
-    // ran, which is why they kept drifting.
+    // Pull toward You-node, stronger if unconnected.
     const xForce = forceX((n: object) => {
       const youNode = graphData.nodes.find((nd) => isYouNode(nd));
       return youNode?.x ?? 0;
@@ -319,18 +288,9 @@ export default function GraphView({
     }).strength((n: object) => ((n as GNode).degree ?? 0) === 0 ? 0.15 : 0.03);
     g.d3Force("x", xForce);
     g.d3Force("y", yForce);
-    // Drop the default 'center' force — it recenters on graph-space (0,0) and
-    // was fighting the anchor-to-"You"-node forces above, which is what pushed
-    // unconnected nodes off toward a competing center instead of settling near the cluster.
+    // Drop default center, it fights the You-anchor.
     g.d3Force("center", null);
-    // Only reheat when the actual topology changed (nodes or links added/removed) —
-    // not on every referential change of `graphData`. That memo also changes
-    // reference when unrelated state updates (e.g. pendingPlacement toggling,
-    // or a data refresh where a pending node is still excluded) cause it to
-    // recompute, even though the node list is identical. Reheating on every
-    // such reference change caused a visible jolt with no real layout change
-    // behind it — including, ironically, jolts while a new node was still
-    // pending placement and hadn't entered the simulation at all.
+    // Reheat on topology change only.
     const nodeSig = graphData.nodes.map((n) => n.id).sort().join(",");
     const linkSig = graphData.links
       .map((l) => `${lid(l.source)}->${lid(l.target)}`)
@@ -340,12 +300,11 @@ export default function GraphView({
       nodeSigRef.current = nodeSig;
       linkSigRef.current = linkSig;
 
-      // Track node count for deletion detection
+      // Deletion check.
       const prevCount = prevNodeCountRef.current;
       prevNodeCountRef.current = graphData.nodes.length;
 
-      // When a new node was just added, pin existing nodes temporarily so the
-      // new node settles into place without dragging the whole layout.
+      // Pin old nodes so new one settles in.
       if (addedNodeRef.current) {
         addedNodeRef.current = false;
         const pinned = new Set<string>();
@@ -391,9 +350,7 @@ export default function GraphView({
         }, 200);
       }
 
-      // Only reheat when nodes changed (added/deleted). Link-only changes
-      // (edge add/delete) don't reheat — the simulation is already cool so
-      // nodes stay in place while the edge appears/disappears.
+      // Reheat on node change only.
       if (nodeSig !== nodeSigRef.current && !isDraggingRef.current) {
         gentleReheat(g);
       } else if (nodeSig !== nodeSigRef.current) {
@@ -402,7 +359,7 @@ export default function GraphView({
     }
   }, [graphData, engineReady]);
 
-  // Neighbor set for the selected person.
+  // Neighbors of selected.
   const neighborIds = useMemo(() => {
     if (!selectedPersonId) return null;
     const s = new Set<string>();
@@ -417,8 +374,6 @@ export default function GraphView({
     () => data.edges.find((e) => e.id === selectedEdgeId) ?? null,
     [data.edges, selectedEdgeId],
   );
-
-  // --- Canvas helpers ---
 
   function ensureAvatar(url: string): HTMLImageElement | undefined {
     const cached = avatarCache.current.get(url);
@@ -438,10 +393,7 @@ export default function GraphView({
   const radiusOf = (n: GNode) =>
     5 + Math.min(n.degree, 10) * 0.9 + (isYouNode(n) ? 4 : 0);
 
-  // Smooth camera animation using cubic in-out easing.
-  // Uses centerAt/zoom with duration=0 on each frame to avoid the library's
-  // dual-tween decoupling and the onFinishUpdate auto-zoom override.
-  // `targetCenter: null` keeps the current center (used for in-place zoom in/out).
+  // Smooth camera tween.
   function animateCamera(targetCenter: { x: number; y: number } | null, targetZoom: number, duration: number): number | null {
     const g = fgRef.current;
     if (!g) return null;
@@ -454,7 +406,7 @@ export default function GraphView({
     const tick = () => {
       const elapsed = performance.now() - startTime;
       const t = Math.min(elapsed / duration, 1);
-      const e = cubicInOut(t);
+      const e = monamiEaseInOut(t);
       g.centerAt(
         startCenter.x + (cx - startCenter.x) * e,
         startCenter.y + (cy - startCenter.y) * e,
@@ -467,7 +419,7 @@ export default function GraphView({
     return rafId;
   }
 
-  // Fit-to-graph: same tween, target computed from the current graph bbox.
+  // Fit to bbox.
   function fitGraph(duration = 400): number | null {
     const g = fgRef.current;
     if (!g || graphData.nodes.length === 0) return null;
@@ -482,14 +434,14 @@ export default function GraphView({
     return animateCamera({ x: cx, y: cy }, zk * 1.0001, duration);
   }
 
-  // Zoom in/out around the current center: same tween, target = current zoom * factor.
+  // Zoom around center.
   function zoomBy(factor: number, duration = 300): number | null {
     const g = fgRef.current;
     if (!g) return null;
     return animateCamera(null, g.zoom() * factor, duration);
   }
 
-  // Define clickable hit area for each node (required when nodeCanvasObjectMode is "replace").
+  // Clickable node area.
   const paintPointerArea = (raw: object, color: string, ctx: CanvasRenderingContext2D, _globalScale: number) => {
     const n = raw as GNode;
     if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) return;
@@ -500,8 +452,7 @@ export default function GraphView({
     ctx.fill();
   };
 
-  // --- Node painter ---
-
+  // Node painter.
   const paintNode = (raw: object, ctx: CanvasRenderingContext2D, scale: number) => {
     const n = raw as GNode;
     if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) return;
@@ -590,12 +541,10 @@ export default function GraphView({
     ctx.restore();
   };
 
-  // --- Link styling (handled entirely by paintCustomLink in replace mode) ---
-
-  // Base width scales with strength: weak=1.5, normal=2.5, strong=3.5.
+  // Width by strength: 1.5 / 2.5 / 3.5.
   const baseWidth = (strength: number) => [1.5, 2.5, 3.5][Math.min(Math.max(strength, 1), 3) - 1] ?? 2.5;
 
-  // Custom link painting: replaces default rendering so nodes always draw on top.
+  // Links paint under nodes.
   const paintCustomLink = (raw: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
     const e = raw as Relationship & { source: { x?: number; y?: number }; target: { x?: number; y?: number } };
     if (!Number.isFinite(e.source?.x) || !Number.isFinite(e.target?.x)) return;
@@ -681,8 +630,6 @@ export default function GraphView({
     for (const p of data.people) m.set(p.id, p);
     return m;
   }, [data.people]);
-
-  // --- Render ---
 
   return (
     <div

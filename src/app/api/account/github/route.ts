@@ -1,4 +1,4 @@
-// DELETE /api/account/github — unlink GitHub from the authenticated user.
+// Unlink GitHub, keeps circle intact.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";

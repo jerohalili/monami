@@ -1,5 +1,4 @@
-// Main app shell: loads graph data, manages selection state, renders the
-// graph canvas, header bar, details sidebar, and add-person/add-edge modals.
+// App shell: constellation, selection, modals, sync menus.
 
 "use client";
 
@@ -55,7 +54,7 @@ export default function NetworkApp() {
   const dragStartY = useRef<number | null>(null);
   const draggingRef = useRef(false);
 
-  // Auto-dismiss toast after 5 seconds
+  // Toast auto-dismiss.
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 5000);
@@ -63,12 +62,12 @@ export default function NetworkApp() {
     }
   }, [toast]);
 
-  // Reset drag offset when selection changes
+  // Reset sheet drag on selection change.
   useEffect(() => {
     setDragOffset(0);
   }, [selectedPersonId, selectedEdgeId]);
 
-  // Close indirect menu when clicking outside
+  // Outside-click closers, setTimeout(0) avoids instant re-close.
   useEffect(() => {
     if (!showIndirectMenu) return;
     const handler = () => setShowIndirectMenu(false);
@@ -79,7 +78,6 @@ export default function NetworkApp() {
     };
   }, [showIndirectMenu]);
 
-  // Close sync menu when clicking outside
   useEffect(() => {
     if (!showSyncMenu) return;
     const handler = () => setShowSyncMenu(false);
@@ -90,7 +88,6 @@ export default function NetworkApp() {
     };
   }, [showSyncMenu]);
 
-  // Close overflow menu when clicking outside
   useEffect(() => {
     if (!showOverflowMenu) return;
     const handler = () => setShowOverflowMenu(false);
@@ -103,7 +100,8 @@ export default function NetworkApp() {
 
   const githubId = (session?.user as { githubId?: string })?.githubId ?? null;
 
-  const handleSyncConnections = async (filter: "all" | "following" | "mutual" = "all") => {
+  // Pull followers/following in. Mutual keeps big circles sane.
+  const pullGithubCircle = async (filter: "all" | "following" | "mutual" = "all") => {
     setSyncingConnections(true);
     try {
       const res = await fetch("/api/github/sync-connections", {
@@ -114,26 +112,28 @@ export default function NetworkApp() {
       const body = await res.json().catch(() => null);
       if (res.ok && body) {
         const parts: string[] = [];
-        if (body.created > 0) parts.push(`${body.created} new`);
-        if (body.matched > 0) parts.push(`${body.matched} updated`);
-        if (body.crossEdgesCreated > 0) parts.push(`${body.crossEdgesCreated} cross-connections`);
-        if (body.skipped > 0) parts.push(`${body.skipped} skipped`);
-        const msg = parts.length > 0 ? `Synced: ${parts.join(", ")}` : "Nothing to sync";
+        if (body.created > 0) parts.push(`${body.created} new in your circle`);
+        if (body.matched > 0) parts.push(`${body.matched} refreshed`);
+        if (body.crossEdgesCreated > 0) parts.push(`${body.crossEdgesCreated} ties between them`);
+        if (body.skipped > 0) parts.push(`${body.skipped} skipped (rate-limit)`);
+        const msg = parts.length > 0 ? `Circle synced: ${parts.join(", ")}` : "Your circle is already up to date";
         const warnings: string[] = body.warnings ?? [];
         setToast({
           message: warnings.length > 0 ? `${msg} (${warnings.join("; ")})` : msg,
           type: warnings.length > 0 ? "error" : "success",
         });
       } else {
-        setToast({ message: body?.error ?? `Sync failed (HTTP ${res.status})`, type: "error" });
+        setToast({ message: body?.error ?? `Couldn't pull your GitHub circle (HTTP ${res.status}) — try again in a minute`, type: "error" });
       }
-      await load();
+      await loadConstellation();
     } catch {
-      setToast({ message: "Sync failed — network error", type: "error" });
-      await load();
+      setToast({ message: "Couldn't reach GitHub — are you offline? Your saved circle is intact.", type: "error" });
+      await loadConstellation();
     }
     setSyncingConnections(false);
   };
+  // Legacy alias.
+  const handleSyncConnections = pullGithubCircle;
 
   const handleSyncGithub = async () => {
     setSyncingGithub(true);
@@ -141,18 +141,19 @@ export default function NetworkApp() {
       const res = await fetch("/api/github/sync-profile", { method: "POST" });
       const body = await res.json().catch(() => null);
       if (res.ok) {
-        setToast({ message: "Profile synced from GitHub", type: "success" });
+        setToast({ message: "Your You-node refreshed from GitHub", type: "success" });
       } else {
-        setToast({ message: body?.error ?? `Sync failed (HTTP ${res.status})`, type: "error" });
+        setToast({ message: body?.error ?? `Couldn't refresh your You-node (HTTP ${res.status})`, type: "error" });
       }
-      await load();
+      await loadConstellation();
     } catch {
-      setToast({ message: "Sync failed — network error", type: "error" });
-      await load();
+      setToast({ message: "GitHub profile sync failed — network hiccup, your circle is untouched", type: "error" });
+      await loadConstellation();
     }
     setSyncingGithub(false);
   };
 
+  // Second-degree sweep, capped.
   const handleSyncIndirect = async (maxConnections: number) => {
     setSyncingIndirect(true);
     try {
@@ -164,31 +165,30 @@ export default function NetworkApp() {
       const body = await res.json().catch(() => null);
       if (res.ok && body) {
         const parts: string[] = [];
-        if (body.cleanedUp > 0) parts.push(`${body.cleanedUp} old removed`);
-        if (body.created > 0) parts.push(`${body.created} discovered`);
+        if (body.cleanedUp > 0) parts.push(`${body.cleanedUp} stale removed`);
+        if (body.created > 0) parts.push(`${body.created} second-degree found`);
         if (body.skipped > 0) parts.push(`${body.skipped} skipped`);
         const msg = parts.length > 0
-          ? `Explored ${body.connectionsExplored} connections — ${parts.join(", ")}`
-          : "No new indirect connections found";
+          ? `Looked through ${body.connectionsExplored} ties — ${parts.join(", ")}`
+          : "No new second-degree ties turned up";
         const warnings: string[] = body.warnings ?? [];
         setToast({
           message: warnings.length > 0 ? `${msg} (${warnings.join("; ")})` : msg,
           type: warnings.length > 0 ? "error" : "success",
         });
       } else {
-        setToast({ message: body?.error ?? `Discover failed (HTTP ${res.status})`, type: "error" });
+        setToast({ message: body?.error ?? `Second-degree sweep failed (HTTP ${res.status}) — likely rate-limited`, type: "error" });
       }
-      await load();
+      await loadConstellation();
     } catch {
-      setToast({ message: "Discover failed — network error", type: "error" });
-      await load();
+      setToast({ message: "Second-degree sweep hit a network error — your circle is fine", type: "error" });
+      await loadConstellation();
     }
     setSyncingIndirect(false);
   };
 
-  // --- Data fetching ---
-
-  const load = useCallback(async () => {
+  // Full constellation fetch, no-store.
+  const loadConstellation = useCallback(async () => {
     try {
       setError(null);
       const res = await fetch("/api/graph", { cache: "no-store" });
@@ -203,34 +203,34 @@ export default function NetworkApp() {
       setData((await res.json()) as GraphPayload);
       everLoadedRef.current = true;
     } catch {
-      setError("Could not load your constellation.");
+      setError("Could not load your constellation — check your connection and hit Retry.");
     } finally {
       setLoading(false);
     }
   }, []);
+  const load = loadConstellation;
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadConstellation(); }, [loadConstellation]);
 
-  // Apply theme to document and persist.
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // --- Selection ---
-
-  const selectPerson = useCallback((id: string | null) => {
+  // Focus one thing at a time.
+  const focusCircleMember = useCallback((id: string | null) => {
     setSelectedPersonId(id);
     setSelectedEdgeId(null);
   }, []);
+  const selectPerson = focusCircleMember;
 
-  const selectEdge = useCallback((id: string | null) => {
+  const focusTie = useCallback((id: string | null) => {
     setSelectedEdgeId(id);
     setSelectedPersonId(null);
   }, []);
+  const selectEdge = focusTie;
 
-  // --- Search filtering ---
-
+  // Search matches name + nickname only.
   const matchedIds = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q || !data) return null;
@@ -251,8 +251,7 @@ export default function NetworkApp() {
     [data, selectedEdgeId],
   );
 
-  // --- Loading / error states ---
-
+  // Full-screen error when circle never loaded.
   if (error && !data) {
     const isSessionExpired = error.includes("Session expired");
     return (
@@ -549,8 +548,7 @@ export default function NetworkApp() {
             query={query}
             onSwitchToNetwork={(person) => {
               setActiveTab("network");
-              // Set pendingPlacement before load so GraphView excludes the node
-              // from the simulation until the user clicks to place it.
+              // Hide until placed.
               setPendingPlacement({ id: person.id, name: person.name });
               load();
             }}
@@ -699,16 +697,7 @@ export default function NetworkApp() {
           onClose={() => setShowAddPerson(false)}
           onCreated={async (person: Person) => {
             setShowAddPerson(false);
-            // Mark as pending *before* refreshing data. GraphView excludes a
-            // pending node from graphData (and therefore from the physics
-            // simulation) only while pendingPlacement is already set at the
-            // moment the node first appears in `data`. If load() ran first,
-            // there'd be a render where the new person is in `data` but
-            // pendingPlacement is still null — GraphView would add it to its
-            // persistent node map right then, and once it's in that map the
-            // later pendingPlacement can no longer hide it. Setting it first
-            // avoids that window entirely, so the graph only reacts once the
-            // user actually clicks to place the node.
+            // Set pending first so canvas hides it until placed.
             setPendingPlacement({ id: person.id, name: person.name });
             await load();
           }}

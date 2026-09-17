@@ -1,13 +1,11 @@
-// Right-side panel showing person details or edge editor.
-// PersonView: avatar, metadata, links, skills, interests, tags, connections.
-// RelationshipEditor: edit origin, strength, context, communities, projects; delete edge.
+// Sidebar for one member or tie.
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { signIn } from "next-auth/react";
 import {
-  ORIGINS, nodeColor, initialsOf, overlap,
+  ORIGINS, nodeColor, initialsOf, sharedCircleTraits,
   type GraphPayload, type Person, type Relationship,
 } from "@/lib/model";
 import { IconExternal, IconPencil, IconRefresh, IconTrash, IconX } from "./icons";
@@ -20,7 +18,7 @@ import {
   EdgeFormFields, edgeToForm, formToEdgePayload, type EdgeFormState,
 } from "./EdgeFormFields";
 
-// --- Shared sub-components ---
+// Avatar fallback for offline cases.
 
 function Avatar({ p, size = 56 }: { p: Pick<Person, "name" | "avatarUrl">; size?: number }) {
   return p.avatarUrl ? (
@@ -44,8 +42,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
-
-// --- Person view ---
 
 function PersonView({ person, data, githubId, onClose, onSelectPerson, onEditClick, onDelete, onSyncGithub, syncingGithub }: {
   person: Person;
@@ -186,8 +182,7 @@ function PersonView({ person, data, githubId, onClose, onSelectPerson, onEditCli
   );
 }
 
-// --- Edge details (read-only) ---
-
+// Read-only tie view.
 function EdgeView({ edge, data, onClose, onSelectPerson, onEditClick, onDelete }: {
   edge: Relationship;
   data: GraphPayload;
@@ -198,7 +193,7 @@ function EdgeView({ edge, data, onClose, onSelectPerson, onEditClick, onDelete }
 }) {
   const source = data.people.find((p) => p.id === edge.sourceId);
   const target = data.people.find((p) => p.id === edge.targetId);
-  const sharedTags = source && target ? overlap(source.tags.filter((t) => t !== "me"), target.tags) : [];
+  const sharedTags = source && target ? sharedCircleTraits(source.tags.filter((t) => t !== "me"), target.tags) : [];
 
   return (
     <>
@@ -292,8 +287,7 @@ function EdgeView({ edge, data, onClose, onSelectPerson, onEditClick, onDelete }
   );
 }
 
-// --- Edge editor ---
-
+// Tie editor.
 function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelectPerson }: {
   edge: Relationship;
   data: GraphPayload;
@@ -327,7 +321,7 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
     setSaving(false);
   };
 
-  const sharedTags = source && target ? overlap(source.tags.filter((t) => t !== "me"), target.tags) : [];
+  const sharedTags = source && target ? sharedCircleTraits(source.tags.filter((t) => t !== "me"), target.tags) : [];
 
   return (
     <>
@@ -353,8 +347,7 @@ function RelationshipEditor({ edge, data, onClose, onChanged, onDeleted, onSelec
   );
 }
 
-// --- Main panel ---
-
+// Main panel: person or tie, view or edit.
 export default function DetailsPanel({ person, edge, data, githubId, onClose, onSelectPerson, onChanged, onClearedSelection, onEditEdgeSelected, onSyncGithub, syncingGithub }: {
   person: Person | null;
   edge: Relationship | null;

@@ -1,5 +1,4 @@
-// POST /api/github/sync-connections — import GitHub followers and following as graph nodes.
-// Optional body: { filter: "all" | "following" | "mutual" }
+// Pull followers/following into circle.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -19,6 +18,8 @@ import { extractSkillsFromRepos } from "@/lib/skills";
 import { fetchWithRetry, MIN_RATE_LIMIT } from "@/lib/github-utils";
 
 type SyncFilter = "all" | "following" | "mutual";
+// Domain name for the same filter, type-only.
+type CircleSyncFilter = SyncFilter;
 
 export async function POST(req: Request) {
   try {

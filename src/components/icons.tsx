@@ -1,4 +1,4 @@
-// SVG icon components used throughout the UI.
+// Hand-drawn SVG icons.
 
 import type { SVGProps } from "react";
 

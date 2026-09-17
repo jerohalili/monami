@@ -1,4 +1,4 @@
-// Custom confirm dialog replacing window.confirm with styled modal.
+// Themed confirm, promise-based.
 
 "use client";
 

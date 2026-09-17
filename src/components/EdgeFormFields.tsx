@@ -1,5 +1,4 @@
-// Edge form: fields for origin, strength, date, context, communities, projects.
-// Shared by AddConnectionModal and DetailsPanel edge editor.
+// Shared tie form (origin, strength, context).
 
 "use client";
 
@@ -18,7 +17,7 @@ export const EMPTY_EDGE_FORM: EdgeFormState = {
   origin: "in_person", context: "", communities: "", projects: "", strength: "2", metAt: "",
 };
 
-/** Convert an existing Relationship into form state for editing. */
+// Tie -> form.
 export function edgeToForm(e: {
   origin: string;
   context: string | null;
@@ -37,7 +36,7 @@ export function edgeToForm(e: {
   };
 }
 
-/** Convert form state into a POST/PATCH body. */
+// Form -> payload.
 export function formToEdgePayload(f: EdgeFormState) {
   return {
     origin: f.origin,

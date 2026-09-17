@@ -1,4 +1,4 @@
-// Discover tab: shows people recommendations and repos (recommended, starred, your repos).
+// Discover: people + repo suggestions.
 
 "use client";
 
@@ -29,6 +29,7 @@ export default function DiscoverView({
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
   const [addPersonPrefill, setAddPersonPrefill] = useState<RecommendedPerson | null>(null);
 
+  // Search stays local so typing never refetches.
   const filteredRepos = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return repos;
@@ -65,8 +66,9 @@ export default function DiscoverView({
     });
   }, [recommendedRepos, query]);
 
+  // Feeds fail independently, hence per-section errors.
   useEffect(() => {
-    async function fetchData() {
+    async function fetchDiscoverFeed() {
       setLoading(true);
       setError(null);
       setSectionErrors({});
@@ -85,7 +87,7 @@ export default function DiscoverView({
           setPeopleRecommendations(peopleData.recommendations || []);
         } else {
           const body = await peopleRes.json().catch(() => null);
-          errors.people = body?.error || `Failed to fetch recommendations (HTTP ${peopleRes.status})`;
+          errors.people = body?.error || `Couldn't score new ties (HTTP ${peopleRes.status}) — your circle is fine, just no fresh suggestions`;
         }
 
         if (reposRecRes.ok) {
@@ -93,7 +95,7 @@ export default function DiscoverView({
           setRepoRecommendations(reposRecData.recommendations || []);
         } else {
           const body = await reposRecRes.json().catch(() => null);
-          errors.repos = body?.error || `Failed to fetch starred repos (HTTP ${reposRecRes.status})`;
+          errors.repos = body?.error || `Couldn't load starred repos (HTTP ${reposRecRes.status}) — usually GitHub rate-limit, retry in a minute`;
         }
 
         if (reposRes.ok) {
@@ -101,7 +103,7 @@ export default function DiscoverView({
           setRepos(reposData.repos || []);
         } else {
           const body = await reposRes.json().catch(() => null);
-          errors.repos = body?.error || `Failed to fetch repos (HTTP ${reposRes.status})`;
+          errors.repos = body?.error || `Couldn't load your repos (HTTP ${reposRes.status}) — link GitHub in Settings if this persists`;
         }
 
         if (recommendedRes.ok) {
@@ -109,19 +111,19 @@ export default function DiscoverView({
           setRecommendedRepos(recommendedData.recommendations || []);
         } else {
           const body = await recommendedRes.json().catch(() => null);
-          errors.recommended = body?.error || `Failed to fetch recommended repos (HTTP ${recommendedRes.status})`;
+          errors.recommended = body?.error || `Couldn't find repos your circle starred (HTTP ${recommendedRes.status})`;
         }
 
         if (Object.keys(errors).length > 0) {
           setSectionErrors(errors);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load data");
+        setError(e instanceof Error ? e.message : "Couldn't load Discover — check connection and reopen the tab");
       } finally {
         setLoading(false);
       }
     }
-    fetchData();
+    fetchDiscoverFeed();
   }, []);
 
   if (loading) {
@@ -148,7 +150,7 @@ export default function DiscoverView({
   return (
     <div className="h-full overflow-y-auto p-4">
       <div className="mx-auto max-w-4xl space-y-6">
-        {/* Main Tabs */}
+        {/* People / Repos switch. */}
         <div className="flex gap-1 rounded-xl p-1" style={{ border: "1px solid var(--border)", background: "var(--bg-card)" }}>
           <button
             className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -170,7 +172,7 @@ export default function DiscoverView({
           </button>
         </div>
 
-        {/* Content */}
+        {/* Feed, filters above already applied. */}
         <div className="space-y-4">
           {query.trim() && (
             <div className="text-xs" style={{ color: "var(--text-dim)" }}>

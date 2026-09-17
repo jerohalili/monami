@@ -1,3 +1,4 @@
+// Shared demo login, resets nightly.
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";

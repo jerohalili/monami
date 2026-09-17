@@ -1,10 +1,10 @@
-// GitHub API utilities for token management and API calls.
+// GitHub token + import helpers.
 
 import { db } from "./db";
 
 const GITHUB_API = "https://api.github.com";
 
-// --- Types ---
+// Shapes we use for imports.
 
 export interface GitHubProfile {
   login: string;
@@ -40,7 +40,7 @@ export interface GitHubRepo {
   updated_at: string;
 }
 
-// --- Token management ---
+// Null if never linked or stale.
 
 export async function getGitHubToken(userId: string): Promise<string | null> {
   const user = await db.user.findUnique({
@@ -50,7 +50,7 @@ export async function getGitHubToken(userId: string): Promise<string | null> {
 
   if (!user?.githubToken) return null;
 
-  // Check if token is expired (with 5-minute buffer)
+  // 5-min buffer.
   if (user.githubTokenExpiry) {
     const bufferMs = 5 * 60 * 1000;
     if (new Date(user.githubTokenExpiry).getTime() - bufferMs < Date.now()) {
@@ -61,7 +61,7 @@ export async function getGitHubToken(userId: string): Promise<string | null> {
   return user.githubToken;
 }
 
-// --- API helpers ---
+// Throws "GitHub API <status>" so backoff can retry.
 
 export async function githubFetch<T>(
   token: string,
@@ -103,7 +103,7 @@ export async function fetchGitHubStarredRepos(token: string): Promise<GitHubRepo
   return fetchAllPaginated<GitHubRepo>(token, "/user/starred?sort=created&direction=desc");
 }
 
-// --- Per-user followers/following (for indirect discovery) ---
+// Second-degree sweep, capped at 3 pages.
 
 export async function fetchUserFollowers(
   token: string,
@@ -158,7 +158,7 @@ export async function getRateLimitRemaining(token: string): Promise<RateLimitInf
   return data.resources.core;
 }
 
-// Paginate with a configurable max page count
+// Paginator for per-user endpoints.
 async function fetchPaginated<T>(token: string, path: string, maxPages: number): Promise<T[]> {
   const results: T[] = [];
   let page = 1;
@@ -186,7 +186,14 @@ export async function fetchGitHubRepoContributors(
   return fetchAllPaginated<GitHubUser>(token, `/repos/${owner}/${repo}/contributors`);
 }
 
-// Paginate through all results (up to 10 pages to avoid excessive API calls)
+// Domain aliases, keep old names working.
+export type CircleGitHubUser = GitHubUser;
+export type CircleGitHubRepo = GitHubRepo;
+export const fetchCircleFollowers = fetchGitHubFollowers;
+export const fetchCircleFollowing = fetchGitHubFollowing;
+export const fetchCircleRepos = fetchGitHubRepos;
+
+// Full paginator, up to 10x100.
 async function fetchAllPaginated<T>(token: string, path: string): Promise<T[]> {
   const results: T[] = [];
   let page = 1;

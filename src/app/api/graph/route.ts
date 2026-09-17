@@ -1,6 +1,4 @@
-// GET /api/graph — returns all people and edges for the graph view.
-// Auto-creates a "You" person if the user has no people yet.
-// Ensures the "You" node always has the "me" tag.
+// Whole constellation in one payload.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -66,6 +64,6 @@ export async function GET() {
       edges: edges.map(edgeDTO),
     });
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to view your constellation" }, { status: 401 });
   }
 }

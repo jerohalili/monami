@@ -1,3 +1,4 @@
+// Minimal forceX/Y types for You-node anchor.
 declare module "d3-force-3d" {
   interface PositionForce {
     (alpha: number): void;

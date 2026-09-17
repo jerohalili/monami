@@ -1,4 +1,4 @@
-// GET /api/github/repos — fetch user's GitHub repositories.
+// Your GitHub repos, sorted by recent.
 
 import { NextResponse } from "next/server";
 import { requireUserId } from "@/lib/auth-guard";

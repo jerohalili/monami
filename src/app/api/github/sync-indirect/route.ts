@@ -1,4 +1,4 @@
-// POST /api/github/sync-indirect — discover followers/following of your GitHub connections.
+// Second-degree sweep, capped pages.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";

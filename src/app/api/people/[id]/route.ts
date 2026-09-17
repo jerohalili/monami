@@ -1,6 +1,4 @@
-// GET /api/people/[id] — fetch a single person.
-// PATCH /api/people/[id] — update a person.
-// DELETE /api/people/[id] — delete a person.
+// Single member: fetch, update, delete.
 
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
@@ -20,10 +18,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const userId = await requireUserId();
     const { id } = await params;
     const person = await db.person.findFirst({ where: { id, userId } });
-    if (!person) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!person) return NextResponse.json({ error: "That circle member is gone" }, { status: 404 });
     return NextResponse.json(personDTO(person));
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to view your circle" }, { status: 401 });
   }
 }
 
@@ -33,11 +31,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { id } = await params;
 
     const existing = await db.person.findFirst({ where: { id, userId } });
-    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!existing) return NextResponse.json({ error: "That circle member is gone — reload your constellation" }, { status: 404 });
 
     const b = await req.json().catch(() => null);
     if (!b || typeof b !== "object") {
-      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+      return NextResponse.json({ error: "Couldn't read those edits — try again" }, { status: 400 });
     }
     const r = b as Record<string, unknown>;
     const data: Prisma.PersonUpdateInput = {};
@@ -57,12 +55,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json(personDTO(person));
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
-        return NextResponse.json({ error: "Not found" }, { status: 404 });
+        return NextResponse.json({ error: "That circle member is gone" }, { status: 404 });
       }
-      return NextResponse.json({ error: "Update failed" }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't save — check headline/links and retry" }, { status: 500 });
     }
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to edit your circle" }, { status: 401 });
   }
 }
 
@@ -72,18 +70,18 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const { id } = await params;
 
     const existing = await db.person.findFirst({ where: { id, userId } });
-    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!existing) return NextResponse.json({ error: "That circle member is already gone" }, { status: 404 });
 
     try {
       await db.person.delete({ where: { id } });
       return new NextResponse(null, { status: 204 });
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
-        return NextResponse.json({ error: "Not found" }, { status: 404 });
+        return NextResponse.json({ error: "That circle member is already gone" }, { status: 404 });
       }
-      return NextResponse.json({ error: "Delete failed" }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't remove them — try again" }, { status: 500 });
     }
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to edit your circle" }, { status: 401 });
   }
 }

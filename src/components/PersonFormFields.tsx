@@ -1,6 +1,4 @@
-// Person form: fields for name, headline, company, nickname, location, avatar,
-// email, github, skills, interests, tags, links, and notes.
-// Shared by AddPersonModal and DetailsPanel edit mode.
+// Shared add/edit member form.
 
 "use client";
 
@@ -28,7 +26,7 @@ export const EMPTY_PERSON_FORM: PersonFormState = {
   tags: "", notes: "", linksRaw: "",
 };
 
-/** Convert a Person object into form state for editing. */
+// Person -> form.
 export function personToForm(p: Person): PersonFormState {
   return {
     name: p.name,
@@ -47,7 +45,7 @@ export function personToForm(p: Person): PersonFormState {
   };
 }
 
-/** Convert form state into a POST/PATCH body. */
+// Form -> payload.
 export function formToPersonPayload(f: PersonFormState) {
   const links: Record<string, string> = {};
   for (const line of f.linksRaw.split("\n")) {

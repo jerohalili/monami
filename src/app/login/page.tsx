@@ -1,3 +1,4 @@
+// Sign-in: GitHub, email, or guest demo.
 "use client";
 
 import { signIn } from "next-auth/react";
@@ -21,6 +22,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Failures stay vague to avoid user-enum.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -35,13 +37,14 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res?.error) {
-      setError("Invalid email or password");
+      setError("Hmm, that email/password didn't match — try again or use GitHub");
     } else {
       router.push("/");
       router.refresh();
     }
   };
 
+  // Guest demo.
   const handleGuest = async () => {
     setError(null);
     setLoading(true);

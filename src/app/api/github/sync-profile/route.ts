@@ -1,4 +1,4 @@
-// POST /api/github/sync-profile — sync GitHub profile data to the "You" person node.
+// Refresh You-node from GitHub profile.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
