@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MonAmi — Design System</title>
+  <title>MonAmi Design System</title>
   <style>
     @page { size: letter; margin: 15mm; }
     @media print {
@@ -713,6 +713,17 @@
         <code style="font-size: 10px; color: #94a3b8;">0 16px 48px rgba(0,0,0,0.7)</code>
       </div>
     </div>
+
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 16px;">
+      <h3 style="margin-bottom: 12px;">Focus Ring</h3>
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <div style="padding: 10px 20px; border-radius: 10px; background: #0b101d; border: 1px solid rgba(255,255,255,0.1); outline: 2px solid #8b5cf6; outline-offset: 2px; font-size: 13px; font-weight: 700; color: #e2e8f0;">Focus Visible</div>
+        <code style="font-size: 12px; color: #94a3b8;">outline: 2px solid var(--color-primary); outline-offset: 2px</code>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: #94a3b8;">
+        Applied to: <code style="color:#8b5cf6;">button:focus-visible</code>, <code style="color:#8b5cf6;">input:focus-visible</code>, <code style="color:#8b5cf6;">a:focus-visible</code>, <code style="color:#8b5cf6;">[tabindex]:focus-visible</code>
+      </div>
+    </div>
   </div>
   
   <div class="section">
@@ -788,6 +799,12 @@
         <td style="color: #475569;">Molecule</td>
         <td style="color: #475569;">Home (sync feedback), Settings (save feedback)</td>
         <td style="color: #475569;">variant (success/error), message, duration</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700; color: #0f172a;">ThemeToggle</td>
+        <td style="color: #475569;">Atom</td>
+        <td style="color: #475569;">Header (every screen)</td>
+        <td style="color: #475569;">reads/writes localStorage, toggles data-theme attribute on &lt;html&gt;</td>
       </tr>
     </table>
   </div>
