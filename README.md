@@ -127,16 +127,19 @@ monami/
 
 ## 6. Screenshots
 
-> Captured from the live site by the author (placeholders — replace `docs/screenshots/*.png` with real captures before grading).
+> Captured from the live site (`monami-one.vercel.app`) by the author on Sep 23, 2026.
 
-![Graph](docs/screenshots/01-graph.png)
-*Force-directed constellation centered on You, with search and zoom controls.*
+![Graph](docs/screenshots/network-graph.jpeg)
+*Force-directed constellation (23 people, 31 connections) with search, legend, and zoom controls.*
 
-![Details + Discover](docs/screenshots/02-discover.png)
-*Detail sidebar with relationship context, and Discover people/repo recommendations.*
+![Sign in](docs/screenshots/signin.jpeg)
+*Sign in — GitHub OAuth, email credentials, or guest pass.*
 
-![Settings](docs/screenshots/03-settings.png)
-*Account settings — email/password, GitHub link/unlink, cascade delete.*
+![Discover people](docs/screenshots/discover-people.jpeg)
+*Discover people — scored recommendations with reasons and one-tap Add.*
+
+![Discover repos](docs/screenshots/discover-repos.jpeg)
+*Discover repos — Recommended, Starred, and Your Repos tabs with search.*
 
 ---
 
