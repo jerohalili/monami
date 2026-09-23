@@ -127,7 +127,7 @@ monami/
 
 ## 6. Screenshots
 
-> Captured from the live site (`monami-one.vercel.app`) by the author on Sep 23, 2026.
+> Captured from the live site (`monami-one.vercel.app`) on Sep 23, 2026.
 
 ![Graph](docs/screenshots/network-graph.jpeg)
 *Force-directed constellation (23 people, 31 connections) with search, legend, and zoom controls.*
