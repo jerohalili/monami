@@ -1,183 +1,156 @@
 # MonAmi | Interactive Networking Constellation
 
-## Short Introduction
+[![Made with AI](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md)
 
-MonAmi is a full-stack web app that turns a developer's professional network into something they can actually see, search, and grow deliberately.
+> Built with AI assistance (Claude + Copilot) across graph tuning, GitHub sync, and recommender work; see [AI-USAGE.md](AI-USAGE.md) for the full log.
 
-Instead of scattering connections across GitHub followers, LinkedIn contacts, and half-remembered Discord DMs, MonAmi pulls everything into a single interactive force-directed graph. Each person becomes a visual node — name, avatar, headline, skills, interests, tags, notes — and edges between nodes carry real context: how you know them, what you share, when you met. On top of the graph, MonAmi recommends new people to connect with and GitHub projects to work on, adapting as your network evolves.
-
-**Core Philosophy:** *Your network is a graph, not a list.*
-
-The project also exists as a way to build a real graph-based data model with relationship context as first-class data, rather than an afterthought note field — the thing most contact tools fail to capture.
+**Repo:** https://github.com/jerohalili/monami
+**Live:** https://monami-one.vercel.app/
 
 ---
 
-## Live Website
+## 1. Overview
 
-**Website:** <https://monami-one.vercel.app/>
+MonAmi turns a developer's professional network into an interactive force-directed graph you can see, search, and grow deliberately. Each person is a node (avatar, headline, skills, tags, notes) and each edge carries real context (how you met, shared communities, strength, date), with GitHub import plus people- and repo-recommendations that adapt as the network evolves.
 
----
+**Core philosophy:** *Your network is a graph, not a list.* Relationship context is first-class data, not an afterthought note field.
 
-## Technologies Used
-
-### Frontend
-
-- React 19
-- Next.js 15 (App Router)
-- TypeScript 5.8
-- Tailwind CSS v4 — CSS-based configuration via `@tailwindcss/postcss`, no `tailwind.config.js`
-- Custom CSS-variable theming system (`--bg-main`, `--text-primary`, `--primary-accent`, etc.) driving dark/light mode via a `data-theme` attribute on `<html>`
-- [react-force-graph-2d](https://github.com/vasturiano/react-force-graph-2d) for canvas-based force-directed graph rendering
-- [d3-force-3d](https://github.com/vasturiano/d3-force-3d) for physics simulation
-- Custom SVG icons (18 hand-drawn components)
-
-### Backend
-
-- Next.js API routes (App Router) — all server logic runs as part of the same Next.js deployment
-- NextAuth v5 beta (`next-auth@5.0.0-beta.32`) — JWT session strategy, GitHub OAuth + Credentials providers
-- Prisma 6.5 ORM
-- bcryptjs for password hashing
-
-### Database
-
-- PostgreSQL (hosted on [Neon](https://neon.tech))
-- Schema-first with Prisma — three models: `User`, `Person`, `Edge`
-- Core tables: `users`, `people`, `edges`
-- Cascade deletes on account removal; unique constraint on edge pairs
-
-### External APIs
-
-- GitHub REST API — profile sync, followers/following import, repository listing, contributor discovery, starred repos
-- DiceBear API — auto-generated avatar SVGs for people without a custom avatar
-
-### Dev Tools
-
-- Vercel (or any Next.js-compatible host) for deployment
-- ESLint
-- TypeScript (`tsc --noEmit`)
+Technologies: Next.js 15 App Router + React 19 + TypeScript + Tailwind v4, `react-force-graph-2d` + `d3-force-3d`, NextAuth v5 (GitHub + Credentials + guest), Prisma 6 + Neon Postgres, GitHub REST API, DiceBear avatars.
 
 ---
 
-## Features
-
-### Interactive Force-Directed Graph
-
-A canvas-rendered network visualization where each person is a node and each relationship is an edge. Nodes are color-coded by name, display avatars (with DiceBear fallback), and show labels on hover. Edges are color-coded by origin type and drawn with different thicknesses and styles based on connection strength — dashed for weak, solid for normal, double-parallel for strong. The "You" node gets a distinct amber/gold glow.
-
-Physics are tuned to center the graph around your node and gently reheat on topology changes without jarring animations. A search bar filters and highlights matching nodes in real time.
-
-### People & Relationship Management
-
-Full CRUD for person nodes (name, nickname, avatar, headline, company, location, email, skills, interests, tags, links, notes) and edges between them. Each edge carries origin type (in-person, GitHub, GitHub indirect, school, work, introduction, online, other), free-text context, shared communities, shared projects, strength level, and date met. A detail sidebar shows all metadata with inline edit mode — no page navigation needed.
-
-A custom confirm dialog replaces `window.confirm` for destructive actions.
-
-### GitHub Integration
-
-- **Profile sync** — pulls your name, avatar, bio, company, location, and email from GitHub into your "You" node automatically.
-- **Connection sync** — imports your GitHub followers and following as graph nodes. Filters: all, following-only, mutual-only. Creates cross-edges between imported people who follow each other.
-- **Indirect discovery** — explores followers/following of your direct connections to surface second-degree contacts you might not know about.
-- **Repos tab** — shows your GitHub repositories in a card grid with language, stars, and description.
-- **Recommendations** — suggests people to connect with based on shared repo contributors, mutual follows, skills/interests overlap, and company/location match. Project recommendations surface repos starred by your direct connections, scored by connection count and language match.
-
-### Discover Tab
-
-Two main tabs: People (recommendations) and Repos. The Repos tab has three sub-tabs: Recommended (repos starred by direct connections, scored by `connections × 2 + language match × 3`), Starred (your GitHub starred repos), and Your Repos (your GitHub repositories). Each supports search filtering, shows empty states when there's nothing to display, and handles loading/error states gracefully. People recommendations show scores, reasons, expandable detail breakdowns, and "Add" buttons that open a pre-filled person form.
-
-### Dark / Light Theme
-
-A CSS-variable theming system with a manual toggle, persisted to `localStorage`, and auto-detected from system preference on first visit. Dark mode adds a star-field background effect. Every screen and component respects the theme consistently.
-
-### Responsive Layout
-
-Desktop shows a fixed sidebar for person/edge details. On phones, the sidebar becomes a bottom-sheet overlay. Less-used actions move into a mobile overflow menu. The graph itself scales and pans to fit any screen size, with zoom in/out/fit controls in the bottom-right corner.
-
-### Account Management
-
-Settings page for viewing account info, changing email/password, linking/unlinking GitHub, and deleting your account (with cascade to all people and edges). A shared guest account is available for quick onboarding without committing to registration.
-
-### Resilient API Handling
-
-Every API route validates auth via a `requireUserId()` helper. Frontend requests check `res.ok` before parsing JSON and surface server error messages or network-failure fallbacks to the user. Toast notifications provide success/error feedback for sync operations.
-
----
-
-## Development Process (How It Was Built and Why)
-
-### Why I Built It
-
-Most people manage their professional network as a scattered mess of platforms, servers, and half-remembered context ("met her in that indie-dev Discord, she does backend"). That context — the *why* behind a connection — is exactly what gets lost first, and it's the part that actually matters when you want to reach back out, ask for an introduction, or find a collaborator.
-
-I wanted to build something that treats relationships as first-class data with real structure (origin, context, shared communities, strength) rather than as free-text notes bolted onto a contact list.
-
-### Build Order
-
-The project was built graph-first, because the entire value proposition depends on whether the data model and visualization feel right:
-
-1. **Data model first.** `User`, `Person`, and `Edge` models were designed in Prisma/Postgres with full relationship metadata before any UI existed — origin types, strength levels, shared communities/projects, and the unique constraint on edge pairs.
-2. **API layer.** Full CRUD routes for people and edges, plus a graph endpoint that returns the complete network payload in one request. Auth middleware protects all routes.
-3. **Graph visualization.** A canvas-rendered force-directed graph using `react-force-graph-2d`, with custom node painting (avatars, initials, color-coding, glow effects), custom link painting (origin-colored, strength-styled), drag-and-drop placement, animated camera transitions, and physics tuning.
-4. **CRUD UI.** Detail sidebar with view/edit modes, add-person and add-connection modals, searchable person picker, edge form with origin/strength/context fields.
-5. **GitHub integration.** OAuth sign-in stores the access token; profile sync, followers/following import with cross-edge creation, indirect discovery, repos tab, and basic recommendations.
-6. **Auth and account management.** NextAuth v5 with GitHub and credentials providers, registration, guest account, settings page, account deletion with cascade.
-7. **Theme and responsive pass.** CSS-variable dark/light system, manual toggle with localStorage persistence, desktop sidebar to mobile bottom-sheet, overflow menu, zoom controls, legend, toast notifications.
-8. **Polish.** Loading states, empty states, custom confirm dialogs, search filtering, error handling across every view.
-
----
-
-## Setup Instructions
+## 2. Setup and installation
 
 ### Prerequisites
 
 - Node.js 18+
-- A [Neon](https://neon.tech) Postgres database (or any Postgres instance — just point `DATABASE_URL` at it)
-- A [GitHub OAuth App](https://github.com/settings/developers) (for GitHub sign-in — set the callback URL to `http://localhost:3000/api/auth/callback/github`)
+- A Postgres database (Neon recommended)
+- A GitHub OAuth App: https://github.com/settings/developers — callback `http://localhost:3000/api/auth/callback/github`
 
-### 1. Clone the repo
+### 2.1 Get the code
 
-```
+```bash
 git clone https://github.com/jerohalili/monami.git
 cd monami
 ```
 
-### 2. Install dependencies
+### 2.2 Install dependencies
 
-```
+```bash
 npm install
 ```
 
-This triggers `postinstall`, which runs `prisma generate` automatically.
+Runs `postinstall → prisma generate` automatically.
 
-### 3. Configure environment
+### 2.3 Environment and configuration
 
-```
+```bash
 cp .env.example .env
 ```
 
-Fill in:
-- `DATABASE_URL` — your Postgres connection string (must include `sslmode=require` for Neon)
-- `AUTH_SECRET` — generate one with `npx auth secret` or any random string
-- `AUTH_GITHUB_ID` — your GitHub OAuth App client ID
-- `AUTH_GITHUB_SECRET` — your GitHub OAuth App client secret
+| Variable | Required | Example value | Notes |
+|----------|----------|---------------|-------|
+| `DATABASE_URL` | Yes | `postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/dbname?sslmode=require` | Postgres/Neon string, `sslmode=require` for Neon. Never commit the real value. |
+| `AUTH_SECRET` | Yes | `npx auth secret` output, e.g. `k7Q…64hex…==` | NextAuth session secret. Generate with `npx auth secret`. |
+| `AUTH_GITHUB_ID` | Yes for GitHub sign-in | `Ov23li…` | OAuth App client ID. |
+| `AUTH_GITHUB_SECRET` | Yes for GitHub sign-in | `436ddf…40chars…` | OAuth App client secret. |
 
-### 4. Push the schema to your database
+### 2.4 Push the schema
 
-```
+```bash
 npm run setup
+# = prisma generate && prisma db push → creates users, people, edges
 ```
 
-This runs `prisma generate` + `prisma db push` to create the tables.
+---
 
-### 5. Run it
+## 3. How to run it
 
-```
+```bash
 npm run dev
 ```
 
-The app starts at `http://localhost:3000`.
+Open http://localhost:3000. Sign in via GitHub, email/password (register first), or one-click guest. First load auto-creates your `You` node; an empty graph with one glowing node means it works. Live reference: https://monami-one.vercel.app/
+
+Other scripts: `npm run build`, `npm start`, `npm run typecheck` (`tsc --noEmit`), `npm run db:push`, `npm run db:reset` (⚠️ `--force-reset`, local only).
+
+---
+
+## 4. Features and usage
+
+Primary flow: **Graph → GitHub sync → Discover → Settings.**
+
+- **Interactive graph (`/`):** canvas force-directed, centered on `You` (amber glow). Nodes color-coded by name with avatar/DiceBear fallback; edges colored by origin (in-person, GitHub, GitHub-indirect, school, work, introduction, online, other) and styled by strength (dashed weak / solid / double strong). Search filters live; drag to place; zoom in/out/fit; click node/edge → detail sidebar (desktop) / bottom-sheet (mobile) with inline edit; custom confirm dialog for deletes.
+- **People & edges CRUD:** full person fields (nickname, headline, company, location, email, skills/interests/tags, links, notes, githubLogin) + edge fields (origin, context, communities, projects, strength 1–3, met date).
+- **GitHub integration:** profile sync into `You` node; connection sync (followers/following import with all/following-only/mutual-only filter + cross-edges between imported who follow each other); indirect discovery (second-degree sweep); repos tab (your repos grid).
+- **Discover tab:** People (scored by shared contributors, mutuals, skills overlap, company/location; reasons + expandable breakdown + Add → prefilled form) and Repos (Recommended `connections×2 + language×3`, Starred, Yours) with search + empty/loading/error states.
+- **Account (`/settings`):** view info, change email/password, link/unlink GitHub, cascade delete account. Shared guest account for quick onboarding.
+- **Resilience:** `requireUserId()` on every API route → 401; frontend `res.ok` checks + toasts; theme (`data-theme` + `localStorage`, star-field dark) + responsive throughout.
+
+### Main API endpoints (all non-auth via `requireUserId()` → 401)
+
+| Method | Path | What it does |
+|--------|------|--------------|
+| GET | `/api/graph` | Whole constellation `{people, edges}`; auto-creates `You` |
+| GET/POST | `/api/people` | List / create person (name required) |
+| GET/PATCH/DELETE | `/api/people/[id]` | Fetch / edit / delete person (owner-scoped, 204 on delete) |
+| GET/POST | `/api/edges` | List / create tie (rejects self-link, 409 on duplicate pair) |
+| PATCH/DELETE | `/api/edges/[id]` | Edit / delete tie |
+| GET | `/api/recommendations` | People recommendations (top 30, enriched top 10) |
+| POST | `/api/github/sync-profile` | Overwrite `You` from GitHub profile + repo skills |
+| POST | `/api/github/sync-connections` | Import followers/following (+ cross-edges) |
+| POST | `/api/github/sync-indirect` | Second-degree sweep |
+| GET | `/api/github/repos`, `/api/github/recommendations?type=` | Own repos / people+repo recommendations |
+| GET/PATCH/DELETE | `/api/account`, `DELETE /api/account/github` | Account info / email+password change / cascade delete / unlink |
+| POST | `/api/auth/register`, `/api/auth/guest` | Email signup (bcrypt) / demo guest login |
+
+---
+
+## 5. Project structure
+
+```
+monami/
+  prisma/schema.prisma   # User, Person, Edge (unique [sourceId,targetId], cascade)
+  src/app/
+    page.tsx, layout.tsx # NetworkApp shell + theme-boot script
+    login/, register/, settings/
+    api/{graph,people,people/[id],edges,edges/[id],recommendations,
+         account,account/github,github/sync-profile,sync-connections,
+         sync-indirect,repos,recommendations,auth/register,auth/guest,auth/[...nextauth]}
+  src/components/        # NetworkApp, GraphView, DiscoverView, DetailsPanel, AddPersonModal, AddConnectionModal, Person/EdgeFormFields, Modal, ConfirmDialog, Providers, icons
+  src/lib/               # auth.ts, auth-guard.ts (requireUserId), db.ts (Prisma singleton), dto.ts, model.ts, github.ts, skills.ts
+  src/middleware.ts      # runtime=nodejs; /login|/register redirect if logged in, pages → /login if not; /api/* pass through for route-level 401
+  next.config.ts         # avatars.githubusercontent.com remote images
+```
+
+---
+
+## 6. Screenshots
+
+> Captured from the live site by the author (placeholders — replace `docs/screenshots/*.png` with real captures before grading).
+
+![Graph](docs/screenshots/01-graph.png)
+*Force-directed constellation centered on You, with search and zoom controls.*
+
+![Details + Discover](docs/screenshots/02-discover.png)
+*Detail sidebar with relationship context, and Discover people/repo recommendations.*
+
+![Settings](docs/screenshots/03-settings.png)
+*Account settings — email/password, GitHub link/unlink, cascade delete.*
+
+---
+
+## 7. Known issues and next steps
+
+- Left to verify on `monami-one` prod: GitHub link/unlink and cascade delete, plus last responsive pass. Nothing blocking.
+- `github/*` error paths return upstream `e.message` (may echo GitHub body) — will sanitize to generic 502/500.
+- Password policy inconsistent (register ≥6 vs account change ≥8) — will unify to 8+.
+- `npm run db:reset` (`--force-reset`) is local-only danger — documented, never exposed via API.
+- Demo `guest@monami.app / guest123` is intentional shared demo with modify/delete hardening.
+- Next: error sanitization + policy unification, then clean `build + typecheck + graph smoke` (add person/edge, sync, Discover).
 
 ---
 
 ## License
 
-See [LICENSE](https://github.com/jerohalili/monami/blob/main/LICENSE) (MIT) for details.
+See [LICENSE](https://github.com/jerohalili/monami/blob/main/LICENSE) (MIT).
