@@ -10,6 +10,7 @@ Started week 1, kept alongside work. Full 6 + 3 + who-wrote-what for finals badg
 - 2026-08-30, Claude — GitHub sync routes (`sync-profile`, `sync-connections` + cross-edges, `sync-indirect`). Kept filters + rate-limit guards. Commits `5149ca0`, `4f7dbe6`, `aacddfb`.
 - 2026-09-02, Copilot — people + repo recommenders (`recommendations/route.ts`, `github/recommendations`, `lib/skills.ts`). Kept scoring, rebalanced after mutual-overweight. Commits `8bac171`, `bdba6ff`, `a9bad81`.
 - 2026-09-19, Claude — README §§1–7 + SECURITY-CHECKLIST wording. Kept structure, evidence in own words. Commit (this change).
+- 2026-09-20–26 (Week 6) — no new AI prompts logged. Screenshots + caption cleanup + portfolio case-study assembly done by hand; no code changes.
 
 ## 2. Where the AI got it wrong
 

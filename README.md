@@ -6,6 +6,7 @@
 
 **Repo:** https://github.com/jerohalili/monami
 **Live:** https://monami-one.vercel.app/
+**Portfolio:** https://jerohalili.github.io/projects/monami-networking-constellation
 
 ---
 
@@ -151,6 +152,7 @@ monami/
 - `npm run db:reset` (`--force-reset`) is local-only danger — documented, never exposed via API.
 - Demo `guest@monami.app / guest123` is intentional shared demo with modify/delete hardening.
 - Next: error sanitization + policy unification, then clean `build + typecheck + graph smoke` (add person/edge, sync, Discover).
+- Portfolio case study live at `jerohalili.github.io/projects/monami-networking-constellation` since Sep 25 — reuses these docs + screenshots for strangers/employers.
 
 ---
 
