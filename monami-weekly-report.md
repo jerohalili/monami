@@ -145,3 +145,66 @@ Status: Feature-complete, polish / pre-final mode.
 ### What is left
 
 - Left to check on monami-one: GitHub link/unlink and cascade delete on prod, plus a last responsive pass. Nothing blocking.
+
+
+---
+
+## Week 5 (calendar Week 6) — September 20-26, 2026: documentation finalize + portfolio launch (3 commits, no code)
+
+### What changed this week
+
+#### Documentation finalize
+
+- `2c3f4fb doc: add ai, security, and update readme` — new `AI-USAGE.md` (23 lines), new `SECURITY-CHECKLIST.md` (70 rows), README rewritten to §§1–7 (graph model, GitHub sync, Discover recommenders, auth + account, endpoints, structure).
+- `90fa016 doc: add screenshots` — 4 live captures in `docs/screenshots/`: `network-graph.jpeg`, `signin.jpeg`, `discover-people.jpeg`, `discover-repos.jpeg`; README §6 wired to them.
+- `b7e5247 doc: clean up` — 1-line README caption cleanup; no code change.
+
+#### Portfolio launch
+
+- `jerohalili.github.io a93dacd` (Sep 25): replaced 4 placeholder projects with 7 real ones including `monami-networking-constellation.md` (~98 lines: force-directed graph, GitHub sync, Discover scoring, endpoints, run steps) + cover `public/images/projects/monami-network.jpeg` + carousel/routing rework; `b30a046` smooth carousel animation, `43ebb66` scroll-refresh fix. MonAmi is now discoverable from the portfolio, not just the repo + live URL.
+
+### Why
+
+- I spent the week on docs + portfolio instead of code because the graph + recommenders were already feature-complete in Week 4; what was missing was a stranger-readable entry point. The portfolio case study reuses the README §§1–7 directly, so polishing one polished both.
+- No code changes was deliberate: touching canvas physics or the recommender without a measured reason would only add regression risk before the final.
+
+### What broke or what I got stuck on
+
+- Nothing broke — doc-only week. The only friction was condensing the README without losing the graph-context + recommender details that make MonAmi more than a contact viewer.
+
+### What is left
+
+- Left to check on monami-one: GitHub link/unlink and cascade delete on prod, plus a last responsive pass. Nothing blocking.
+
+---
+
+## Addendum — September 27, 2026: docs follow-up (1 commit, no code)
+
+### What changed
+
+- `b74e04b doc: screenshots and clean up` — docs-only follow-up: `AI-USAGE.md` +1 line (2026-09-20–26 hand-note, no new AI prompts), `README.md` portfolio header + portfolio-live footer.
+
+### Why
+
+- This commit landed Sep 27, after the Sep 20–26 window, so it is logged here to keep the report honest.
+
+---
+
+## Addendum — October 4, 2026: search icon behind search bar (UI fix, no API/DB change)
+
+### What changed
+
+- `src/components/NetworkApp.tsx:328` — added `z-10` to the header `IconSearch` so the magnifier paints above the opaque `.field` input background.
+- `src/components/AddConnectionModal.tsx:124` — same `z-10` fix for the `Search people...` input (same pattern, same bug).
+
+### Why
+
+- The icon is `absolute` with no `z-index` and the input comes after it in DOM with opaque `background: var(--bg-input)` (`src/app/globals.css:76-83`) plus `backdrop-blur`, so the bar covered the icon. `pl-9` spacing was already correct; only layering was wrong. `pointer-events-none` is kept so clicks still land in the input.
+
+### What broke or what I got stuck on
+
+- Nothing broke; `npm run typecheck` passes. Visual check left: header search + Add Connection search in dark/light and mobile widths.
+
+### What is left
+
+- Retake screenshots only if the search bar is visible in them; otherwise no screenshot churn.

@@ -325,7 +325,7 @@ export default function NetworkApp() {
 
         {/* Search */}
         <div className="pointer-events-auto relative min-w-40 flex-1 lg:max-w-md">
-          <IconSearch width={15} height={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-dim)" }} />
+          <IconSearch width={15} height={15} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2" style={{ color: "var(--text-dim)" }} />
           <input
             className="field rounded-xl backdrop-blur pl-9"
             placeholder="Search..."
