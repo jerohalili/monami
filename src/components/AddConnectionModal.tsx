@@ -1,4 +1,4 @@
-// Add-tie modal with person picker.
+// Add-edge modal with person picker.
 
 "use client";
 
@@ -11,7 +11,7 @@ import {
   type EdgeFormState,
 } from "./EdgeFormFields";
 import type { Person, Relationship } from "@/lib/model";
-import { nodeColor, initialsOf } from "@/lib/model";
+import { colorForName, initialsOf } from "@/lib/model";
 import { IconSearch, IconX } from "./icons";
 
 export default function AddConnectionModal({
@@ -162,7 +162,7 @@ export default function AddConnectionModal({
                 ) : (
                   <div
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                    style={{ background: nodeColor(p.name), color: "#0b101d" }}
+                    style={{ background: colorForName(p.name), color: "#0b101d" }}
                   >
                     {initialsOf(p.name)}
                   </div>

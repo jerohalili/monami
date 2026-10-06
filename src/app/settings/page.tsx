@@ -1,4 +1,4 @@
-// Settings: email, password, GitHub link, delete circle.
+// Settings: email, password, GitHub link, delete account.
 "use client";
 
 import { signOut, useSession } from "next-auth/react";

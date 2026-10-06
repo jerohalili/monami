@@ -1,4 +1,4 @@
-// Shared add/edit member form.
+// Shared add/edit person form.
 
 "use client";
 

@@ -59,12 +59,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Clean up previous indirect nodes first (raw SQL for JSON array matching)
-    const staleIds: { id: string }[] = await db.$queryRaw`
-      SELECT id FROM "Person" WHERE tags::text LIKE '%github_indirect%'
-    `;
+    // Clean up previous indirect nodes first
+    const stalePeople = await db.person.findMany({ where: { userId }, select: { id: true, tags: true } });
+    const staleIds = stalePeople
+      .filter((p) => Array.isArray(p.tags) && (p.tags as string[]).includes("github_indirect"))
+      .map((p) => p.id);
     if (staleIds.length > 0) {
-      const ids = staleIds.map((p) => p.id);
+      const ids = staleIds;
       await db.edge.deleteMany({
         where: {
           OR: [
@@ -282,7 +283,7 @@ export async function POST(req: Request) {
       cleanedUp: staleIds.length,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.warn("sync-indirect failed", e);
+    return NextResponse.json({ error: "Second-degree sync failed" }, { status: 500 });
   }
 }

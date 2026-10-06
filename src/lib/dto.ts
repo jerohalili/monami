@@ -1,12 +1,9 @@
-// Prisma row -> clean DTO. Wren seed = You-node fallback avatar.
-
+// Prisma rows to API shapes.
 import type { Prisma } from "@prisma/client";
 import { autoAvatarUrl, isOrigin, type Origin, type Person, type Relationship } from "./model";
 
 type PersonRow = Prisma.PersonGetPayload<object>;
 type EdgeRow = Prisma.EdgeGetPayload<object>;
-
-// Json -> string[] guard.
 
 function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -22,15 +19,12 @@ function toRecord(value: unknown): Record<string, string> {
   return out;
 }
 
-// Form inputs: comma string or string[].
-
+// Accepts a comma-separated string or string[].
 export function optionalString(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const t = v.trim();
   return t ? t : null;
 }
-// Alias: trim empty to null.
-export const trimToNull = optionalString;
 
 export function toStringArrayInput(value: unknown): string[] {
   if (Array.isArray(value)) return toStringArray(value);
@@ -39,12 +33,9 @@ export function toStringArrayInput(value: unknown): string[] {
   }
   return [];
 }
-export const splitCircleListInput = toStringArrayInput;
-
 export function toLinksInput(value: unknown): Record<string, string> {
   return toRecord(value);
 }
-export const parseCircleLinks = toLinksInput;
 
 export function personDTO(p: PersonRow): Person {
   return {
@@ -65,8 +56,7 @@ export function personDTO(p: PersonRow): Person {
   };
 }
 
-// Edge row -> tie, falls back to "other".
-export const toCircleMember = personDTO;
+// Unknown origins fall back to "other".
 export function edgeDTO(e: EdgeRow): Relationship {
   return {
     id: e.id,
@@ -80,4 +70,3 @@ export function edgeDTO(e: EdgeRow): Relationship {
     metAt: e.metAt ? e.metAt.toISOString() : null,
   };
 }
-export const toTie = edgeDTO;

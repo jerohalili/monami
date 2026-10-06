@@ -1,4 +1,4 @@
-// Refresh You-node from GitHub profile.
+// Refresh the own profile node from the GitHub profile.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -23,11 +23,11 @@ export async function POST() {
     try {
       profile = await fetchGitHubProfile(token);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "GitHub API request failed";
-      return NextResponse.json({ error: msg }, { status: 502 });
+      console.warn("github profile fetch failed", e);
+      return NextResponse.json({ error: "GitHub request failed" }, { status: 502 });
     }
 
-    // Find the user's "You" person node by the "me" tag
+    // Find the user's own person node by the "me" tag
     const people = await db.person.findMany({ where: { userId } });
     const you = people.find((p) => {
       const tags = Array.isArray(p.tags) ? p.tags : [];
@@ -35,10 +35,7 @@ export async function POST() {
     });
 
     if (!you) {
-      return NextResponse.json(
-        { error: "No 'You' node found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Own profile node not found" }, { status: 404 });
     }
 
     // Extract skills from the user's own repos
@@ -46,8 +43,8 @@ export async function POST() {
     try {
       const repos = await fetchGitHubRepos(token);
       extractedSkills = extractSkillsFromRepos(repos);
-    } catch {
-      // Skip repo fetch on error
+    } catch (e) {
+      console.warn("repo skill extract failed", e);
     }
 
     // Full overwrite: always set fields from GitHub profile
@@ -69,7 +66,7 @@ export async function POST() {
 
     return NextResponse.json(personDTO(updated));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.warn("sync-profile failed", e);
+    return NextResponse.json({ error: "Profile sync failed" }, { status: 500 });
   }
 }

@@ -1,4 +1,4 @@
-// GitHub token + import helpers.
+// GitHub API helpers with pagination and token handling.
 
 import { db } from "./db";
 
@@ -40,8 +40,7 @@ export interface GitHubRepo {
   updated_at: string;
 }
 
-// Null if never linked or stale.
-
+// Returns null when no token is stored or it is past the expiry buffer.
 export async function getGitHubToken(userId: string): Promise<string | null> {
   const user = await db.user.findUnique({
     where: { id: userId },
@@ -61,8 +60,7 @@ export async function getGitHubToken(userId: string): Promise<string | null> {
   return user.githubToken;
 }
 
-// Throws "GitHub API <status>" so backoff can retry.
-
+// Throws a coded error so callers can decide to retry or sanitize.
 export async function githubFetch<T>(
   token: string,
   path: string,
@@ -186,14 +184,7 @@ export async function fetchGitHubRepoContributors(
   return fetchAllPaginated<GitHubUser>(token, `/repos/${owner}/${repo}/contributors`);
 }
 
-// Domain aliases, keep old names working.
-export type CircleGitHubUser = GitHubUser;
-export type CircleGitHubRepo = GitHubRepo;
-export const fetchCircleFollowers = fetchGitHubFollowers;
-export const fetchCircleFollowing = fetchGitHubFollowing;
-export const fetchCircleRepos = fetchGitHubRepos;
-
-// Full paginator, up to 10x100.
+// Paginate up to 10 pages of 100 items.
 async function fetchAllPaginated<T>(token: string, path: string): Promise<T[]> {
   const results: T[] = [];
   let page = 1;

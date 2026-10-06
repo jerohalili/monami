@@ -49,7 +49,7 @@ export default function RegisterPage() {
         router.refresh();
       }
     } catch {
-      setError("Couldn't create your circle — check connection and try again.");
+      setError("Could not create your account. Check your connection and try again.");
       setLoading(false);
     }
   };

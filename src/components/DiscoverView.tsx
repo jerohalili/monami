@@ -1,12 +1,12 @@
-// Discover: people + repo suggestions.
-
+// Discover: suggested people and repositories.
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { GitHubRepo } from "@/lib/github";
 import type { RecommendedPerson, Person, RecommendedRepo } from "@/lib/model";
 import { IconExternal, IconStar, IconGitBranch, IconCompass, IconPlus } from "./icons";
 import AddPersonModal from "./AddPersonModal";
+import { useFiltered } from "./useFiltered";
 
 type Tab = "people" | "repos";
 type RepoSubTab = "recommended" | "starred" | "yours";
@@ -29,44 +29,30 @@ export default function DiscoverView({
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
   const [addPersonPrefill, setAddPersonPrefill] = useState<RecommendedPerson | null>(null);
 
-  // Search stays local so typing never refetches.
-  const filteredRepos = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return repos;
-    return repos.filter((repo) => {
-      const searchable = [repo.name, repo.description ?? "", repo.language ?? ""].join(" ").toLowerCase();
-      return searchable.includes(q);
-    });
-  }, [repos, query]);
+  const repoText = useCallback(
+    (repo: GitHubRepo) => [repo.name, repo.description ?? "", repo.language ?? ""].join(" "),
+    [],
+  );
+  const personText = useCallback(
+    (person: RecommendedPerson) => [person.name, person.githubLogin ?? "", ...person.reasons].join(" "),
+    [],
+  );
+  const repoRecText = useCallback(
+    (repo: RecommendedRepo) => [repo.name, repo.full_name, repo.description ?? "", repo.language ?? ""].join(" "),
+    [],
+  );
+  const recommendedRepoText = useCallback(
+    (repo: RecommendedRepo) =>
+      [repo.name, repo.full_name, repo.description ?? "", repo.language ?? "", ...repo.reasons].join(" "),
+    [],
+  );
 
-  const filteredPeople = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return peopleRecommendations;
-    return peopleRecommendations.filter((person) => {
-      const searchable = [person.name, person.githubLogin ?? "", ...person.reasons].join(" ").toLowerCase();
-      return searchable.includes(q);
-    });
-  }, [peopleRecommendations, query]);
+  const filteredRepos = useFiltered(repos, query, repoText);
+  const filteredPeople = useFiltered(peopleRecommendations, query, personText);
+  const filteredRepoRecommendations = useFiltered(repoRecommendations, query, repoRecText);
+  const filteredRecommendedRepos = useFiltered(recommendedRepos, query, recommendedRepoText);
 
-  const filteredRepoRecommendations = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return repoRecommendations;
-    return repoRecommendations.filter((repo) => {
-      const searchable = [repo.name, repo.full_name, repo.description ?? "", repo.language ?? ""].join(" ").toLowerCase();
-      return searchable.includes(q);
-    });
-  }, [repoRecommendations, query]);
-
-  const filteredRecommendedRepos = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return recommendedRepos;
-    return recommendedRepos.filter((repo) => {
-      const searchable = [repo.name, repo.full_name, repo.description ?? "", repo.language ?? "", ...repo.reasons].join(" ").toLowerCase();
-      return searchable.includes(q);
-    });
-  }, [recommendedRepos, query]);
-
-  // Feeds fail independently, hence per-section errors.
+  // Each feed fails independently and reports a section error.
   useEffect(() => {
     async function fetchDiscoverFeed() {
       setLoading(true);
@@ -82,37 +68,19 @@ export default function DiscoverView({
 
         const errors: Record<string, string> = {};
 
-        if (peopleRes.ok) {
-          const peopleData = await peopleRes.json();
-          setPeopleRecommendations(peopleData.recommendations || []);
-        } else {
-          const body = await peopleRes.json().catch(() => null);
-          errors.people = body?.error || `Couldn't score new ties (HTTP ${peopleRes.status}) — your circle is fine, just no fresh suggestions`;
-        }
+        const readList = async <T,>(res: Response, key: string): Promise<T[]> => {
+          const body = await res.json().catch(() => null);
+          if (!res.ok) {
+            errors[key] = body?.error ?? `Request failed (HTTP ${res.status})`;
+            return [];
+          }
+          return (body?.recommendations ?? body?.repos ?? []) as T[];
+        };
 
-        if (reposRecRes.ok) {
-          const reposRecData = await reposRecRes.json();
-          setRepoRecommendations(reposRecData.recommendations || []);
-        } else {
-          const body = await reposRecRes.json().catch(() => null);
-          errors.repos = body?.error || `Couldn't load starred repos (HTTP ${reposRecRes.status}) — usually GitHub rate-limit, retry in a minute`;
-        }
-
-        if (reposRes.ok) {
-          const reposData = await reposRes.json();
-          setRepos(reposData.repos || []);
-        } else {
-          const body = await reposRes.json().catch(() => null);
-          errors.repos = body?.error || `Couldn't load your repos (HTTP ${reposRes.status}) — link GitHub in Settings if this persists`;
-        }
-
-        if (recommendedRes.ok) {
-          const recommendedData = await recommendedRes.json();
-          setRecommendedRepos(recommendedData.recommendations || []);
-        } else {
-          const body = await recommendedRes.json().catch(() => null);
-          errors.recommended = body?.error || `Couldn't find repos your circle starred (HTTP ${recommendedRes.status})`;
-        }
+        setPeopleRecommendations(await readList<RecommendedPerson>(peopleRes, "people"));
+        setRepoRecommendations(await readList<RecommendedRepo>(reposRecRes, "starred"));
+        setRepos(await readList<GitHubRepo>(reposRes, "repos"));
+        setRecommendedRepos(await readList<RecommendedRepo>(recommendedRes, "recommended"));
 
         if (Object.keys(errors).length > 0) {
           setSectionErrors(errors);

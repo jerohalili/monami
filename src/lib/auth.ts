@@ -63,7 +63,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               },
             });
           } else {
-            // Brand new circle.
+            // New account.
             existingUser = await db.user.create({
               data: {
                 email: user.email,

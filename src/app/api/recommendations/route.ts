@@ -1,9 +1,8 @@
-// People recs: skills, company/city, contributors.
-
+// People recommendations: local overlap plus GitHub contributor signals.
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-guard";
-import { autoAvatarUrl, sharedCircleTraits } from "@/lib/model";
+import { autoAvatarUrl, sharedTraits } from "@/lib/model";
 import { normalizeSkills, extractSkillsFromRepos } from "@/lib/skills";
 import {
   getGitHubToken,
@@ -15,7 +14,9 @@ import {
   fetchUserRepos,
   githubFetch,
   getRateLimitRemaining,
+  type GitHubRepo,
 } from "@/lib/github";
+import { applyDiversityCap, freshnessBoost, recencyFactor, scoreSharedTraits } from "@/lib/recommend/scoring";
 
 interface Candidate {
   name: string;
@@ -120,7 +121,7 @@ export async function GET() {
       return c;
     };
 
-    // Signal 1: skills/interests vs You-node.
+    // Signal 1: skills/interests overlap with the own profile.
     if (meNode) {
       const myConnections = adjacency.get(meNode.id) ?? new Set();
       for (const person of existingPeople) {
@@ -129,13 +130,11 @@ export async function GET() {
         const personSkills = normalizeSkills(Array.isArray(person.skills) ? (person.skills as string[]) : []);
         const personInterests = normalizeSkills(Array.isArray(person.interests) ? (person.interests as string[]) : []);
 
-        const sharedSkills = sharedCircleTraits(mySkills, personSkills);
-        const sharedInterests = sharedCircleTraits(myInterests, personInterests);
+        const sharedSkills = sharedTraits(mySkills, personSkills);
+        const sharedInterests = sharedTraits(myInterests, personInterests);
 
         if (sharedSkills.length > 0 || sharedInterests.length > 0) {
-          // Recency boost: profiles updated in last 30 days get 1.1x
-          const profileAgeDays = (Date.now() - new Date(person.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-          const freshnessBoost = profileAgeDays < 30 ? 1.1 : 1.0;
+          const boost = freshnessBoost(person.updatedAt);
 
           const c = getOrCreate(person.id, {
             name: person.name,
@@ -143,7 +142,7 @@ export async function GET() {
             location: person.location,
             githubLogin: person.githubLogin,
           });
-          c.score += (sharedSkills.length + sharedInterests.length * 1.5) * freshnessBoost;
+          c.score += scoreSharedTraits(sharedSkills.length, sharedInterests.length, boost);
           if (sharedSkills.length > 0) {
             c.reasons.push(`Shares skills: ${sharedSkills.slice(0, 3).join(", ")}`);
             c.reasonDetails.sharedSkills = sharedSkills;
@@ -190,10 +189,34 @@ export async function GET() {
       try {
         const rateLimit = await getRateLimitRemaining(token);
         if (rateLimit.remaining < 30) canCallGitHub = false;
-      } catch {
-        // If we can't check rate limit, assume we can proceed
+      } catch (e) {
+        console.warn("rate limit check failed", e);
       }
     }
+
+    const scoreContributors = (
+      contributors: { login: string; name: string | null; avatar_url: string }[],
+      repo: GitHubRepo,
+      weight: number,
+    ) => {
+      const factor = recencyFactor(repo.updated_at) * weight;
+      for (const contributor of contributors) {
+        if (existingLogins.has(contributor.login)) continue;
+        const c = getOrCreate(contributor.login, {
+          name: contributor.name ?? contributor.login,
+          avatarUrl: contributor.avatar_url,
+          githubLogin: contributor.login,
+        });
+        c.score += factor;
+        c.reasonDetails.contributedRepos ??= [];
+        if (!c.reasonDetails.contributedRepos.includes(repo.name)) {
+          c.reasonDetails.contributedRepos.push(repo.name);
+        }
+        const idx = c.reasons.findIndex((r) => r.startsWith("Contributor to"));
+        if (idx < 0) c.reasons.push(`Contributor to ${repo.name}`);
+        else c.reasons[idx] = "Contributor to multiple repos";
+      }
+    };
 
     if (token && canCallGitHub) {
       try {
@@ -203,87 +226,29 @@ export async function GET() {
           try {
             const [owner, repoName] = repo.full_name.split("/");
             const contributors = await fetchGitHubRepoContributors(token, owner, repoName);
-
-            const repoAgeDays = (Date.now() - new Date(repo.updated_at).getTime()) / (1000 * 60 * 60 * 24);
-            const recencyFactor = repoAgeDays < 90
-              ? 1
-              : repoAgeDays < 365
-                ? 1 - ((repoAgeDays - 90) / 510) * 0.7
-                : 0.3;
-
-            for (const contributor of contributors) {
-              if (existingLogins.has(contributor.login)) continue;
-
-              const c = getOrCreate(contributor.login, {
-                name: contributor.name ?? contributor.login,
-                avatarUrl: contributor.avatar_url,
-                githubLogin: contributor.login,
-              });
-              c.score += recencyFactor;
-              if (!c.reasonDetails.contributedRepos) {
-                c.reasonDetails.contributedRepos = [];
-              }
-              if (!c.reasonDetails.contributedRepos.includes(repo.name)) {
-                c.reasonDetails.contributedRepos.push(repo.name);
-              }
-              if (!c.reasons.some((r) => r.startsWith("Contributor to"))) {
-                c.reasons.push(`Contributor to ${repo.name}`);
-              } else {
-                const idx = c.reasons.findIndex((r) => r.startsWith("Contributor to"));
-                if (idx >= 0) {
-                  c.reasons[idx] = `Contributor to multiple repos`;
-                }
-              }
-            }
-          } catch {
-            // Skip repos where we can't fetch contributors
+            scoreContributors(contributors, repo, 1);
+          } catch (e) {
+            console.warn("contributor fetch failed", e);
           }
         }
 
-        // Starred repos contributors (up to 10)
+        // Starred repos contributors (up to 10, half weight)
         try {
           const starredRepos = await fetchGitHubStarredRepos(token);
           for (const repo of starredRepos.slice(0, 10)) {
             try {
               const [owner, repoName] = repo.full_name.split("/");
               const contributors = await fetchGitHubRepoContributors(token, owner, repoName);
-
-              const repoAgeDays = (Date.now() - new Date(repo.updated_at).getTime()) / (1000 * 60 * 60 * 24);
-              const recencyFactor = (repoAgeDays < 90 ? 1 : repoAgeDays < 365 ? 1 - ((repoAgeDays - 90) / 510) * 0.7 : 0.3) * 0.5;
-
-              for (const contributor of contributors) {
-                if (existingLogins.has(contributor.login)) continue;
-
-                const c = getOrCreate(contributor.login, {
-                  name: contributor.name ?? contributor.login,
-                  avatarUrl: contributor.avatar_url,
-                  githubLogin: contributor.login,
-                });
-                c.score += recencyFactor;
-                if (!c.reasonDetails.contributedRepos) {
-                  c.reasonDetails.contributedRepos = [];
-                }
-                if (!c.reasonDetails.contributedRepos.includes(repo.name)) {
-                  c.reasonDetails.contributedRepos.push(repo.name);
-                }
-                if (!c.reasons.some((r) => r.startsWith("Contributor to"))) {
-                  c.reasons.push(`Contributor to ${repo.name}`);
-                } else {
-                  const idx = c.reasons.findIndex((r) => r.startsWith("Contributor to"));
-                  if (idx >= 0) {
-                    c.reasons[idx] = `Contributor to multiple repos`;
-                  }
-                }
-              }
-            } catch {
-              // Skip repos where we can't fetch contributors
+              scoreContributors(contributors, repo, 0.5);
+            } catch (e) {
+              console.warn("starred contributor fetch failed", e);
             }
           }
-        } catch {
-          // Starred repos fetch might fail on rate limit
+        } catch (e) {
+          console.warn("starred repos fetch failed", e);
         }
-      } catch {
-        // GitHub token might be expired or invalid, skip GitHub signals
+      } catch (e) {
+        console.warn("repository fetch failed", e);
       }
     }
 
@@ -411,8 +376,8 @@ export async function GET() {
       const normalizedInterests = normalizeSkills(c.interests);
 
       if (normalizedSkills.length > 0 || normalizedInterests.length > 0) {
-        const sharedSkills = sharedCircleTraits(mySkills, normalizedSkills);
-        const sharedInterests = sharedCircleTraits(myInterests, normalizedInterests);
+        const sharedSkills = sharedTraits(mySkills, normalizedSkills);
+        const sharedInterests = sharedTraits(myInterests, normalizedInterests);
 
         if (sharedSkills.length > 0 && !c.reasonDetails.sharedSkills) {
           c.score += sharedSkills.length;
@@ -439,27 +404,11 @@ export async function GET() {
       }
     }
 
-    // --- Step 7: Sort, diversity cap, and return ---
     const sorted = Array.from(candidates.values())
       .filter((c) => c.score > 0)
       .sort((a, b) => b.score - a.score);
 
-    // Diversity: cap at 6 from same company, 5 from same location
-    const companyCounts = new Map<string, number>();
-    const locationCounts = new Map<string, number>();
-    const diversified: Candidate[] = [];
-
-    for (const c of sorted) {
-      const compKey = c.company?.toLowerCase() ?? "";
-      const locKey = c.location?.toLowerCase() ?? "";
-
-      if (compKey && (companyCounts.get(compKey) ?? 0) >= 6) continue;
-      if (locKey && (locationCounts.get(locKey) ?? 0) >= 5) continue;
-
-      diversified.push(c);
-      if (compKey) companyCounts.set(compKey, (companyCounts.get(compKey) ?? 0) + 1);
-      if (locKey) locationCounts.set(locKey, (locationCounts.get(locKey) ?? 0) + 1);
-    }
+    const diversified = applyDiversityCap(sorted, 6, 5);
 
     for (const c of diversified) {
       c.score = Math.round(c.score * 100) / 100;
@@ -469,9 +418,8 @@ export async function GET() {
 
     return NextResponse.json({ recommendations: results });
   } catch (e) {
-    // Real DB/GitHub blowups only.
     if (e instanceof UnauthorizedError) throw e;
-    const msg = e instanceof Error ? e.message : "Couldn't score new ties — try reopening Discover";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.warn("recommendations failed", e);
+    return NextResponse.json({ error: "Could not load recommendations" }, { status: 500 });
   }
 }

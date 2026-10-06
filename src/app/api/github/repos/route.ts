@@ -1,5 +1,4 @@
-// Your GitHub repos, sorted by recent.
-
+// Own GitHub repos, most recently updated first.
 import { NextResponse } from "next/server";
 import { requireUserId } from "@/lib/auth-guard";
 import { getGitHubToken, fetchGitHubRepos } from "@/lib/github";
@@ -20,13 +19,13 @@ export async function GET() {
     try {
       repos = await fetchGitHubRepos(token);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "GitHub API request failed";
-      return NextResponse.json({ error: msg }, { status: 502 });
+      console.warn("github repos fetch failed", e);
+      return NextResponse.json({ error: "GitHub request failed" }, { status: 502 });
     }
 
     return NextResponse.json({ repos });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.warn("repos route failed", e);
+    return NextResponse.json({ error: "Could not load repositories" }, { status: 500 });
   }
 }

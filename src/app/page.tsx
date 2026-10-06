@@ -1,4 +1,4 @@
-// Home is just the constellation.
+// Home renders the graph shell.
 import NetworkApp from "@/components/NetworkApp";
 
 export default function Home() {

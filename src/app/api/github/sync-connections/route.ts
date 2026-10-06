@@ -1,4 +1,4 @@
-// Pull followers/following into circle.
+// Import followers and following as people, with edges from the user's own node.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -16,10 +16,9 @@ import {
 } from "@/lib/github";
 import { extractSkillsFromRepos } from "@/lib/skills";
 import { fetchWithRetry, MIN_RATE_LIMIT } from "@/lib/github-utils";
+import { applySyncFilter, edgeContextFor, personTagsFor } from "@/lib/github-sync";
 
 type SyncFilter = "all" | "following" | "mutual";
-// Domain name for the same filter, type-only.
-type CircleSyncFilter = SyncFilter;
 
 export async function POST(req: Request) {
   try {
@@ -64,12 +63,10 @@ export async function POST(req: Request) {
     const following: GitHubUser[] = followingResult.status === "fulfilled" ? followingResult.value : [];
     const followers: GitHubUser[] = followersResult.status === "fulfilled" ? followersResult.value : [];
 
-    // If both failed, return error
+    // If both failed, return a generic error without upstream details
     if (followingResult.status === "rejected" && followersResult.status === "rejected") {
-      const msg = followingResult.reason instanceof Error
-        ? followingResult.reason.message
-        : "GitHub API request failed";
-      return NextResponse.json({ error: msg }, { status: 502 });
+      console.warn("github connections fetch failed", followingResult.reason);
+      return NextResponse.json({ error: "GitHub request failed" }, { status: 502 });
     }
 
     // Track partial failures for user notification
@@ -91,18 +88,12 @@ export async function POST(req: Request) {
       if (!allUsers.has(u.login)) allUsers.set(u.login, u);
     }
 
-    // Apply filter
-    if (filter === "following") {
-      for (const login of allUsers.keys()) {
-        if (!followingLogins.has(login)) allUsers.delete(login);
-      }
-    } else if (filter === "mutual") {
-      for (const login of allUsers.keys()) {
-        if (!(followingLogins.has(login) && followerLogins.has(login))) allUsers.delete(login);
-      }
+    const visible = applySyncFilter(new Set(allUsers.keys()), followingLogins, followerLogins, filter);
+    for (const login of allUsers.keys()) {
+      if (!visible.has(login)) allUsers.delete(login);
     }
 
-    // Find the user's "You" person node
+    // Find the user's own person node
     const people = await db.person.findMany({ where: { userId } });
     const you = people.find((p) => {
       const tags = Array.isArray(p.tags) ? p.tags : [];
@@ -110,10 +101,7 @@ export async function POST(req: Request) {
     });
 
     if (!you) {
-      return NextResponse.json(
-        { error: "No 'You' node found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Own profile node not found" }, { status: 404 });
     }
 
     // Index existing people by githubLogin for fast lookup
@@ -132,17 +120,7 @@ export async function POST(req: Request) {
       let person = byGithubLogin.get(login) ?? null;
 
       if (!person) {
-        // Create new Person node with appropriate tags
-        const tags: string[] = ["github"];
-        const isFollowing = followingLogins.has(login);
-        const isFollower = followerLogins.has(login);
-
-        if (isFollowing && !isFollower) {
-          tags.push("github_following");
-        } else if (!isFollowing && isFollower) {
-          tags.push("github_follower");
-        }
-        // Mutual follow → just "github"
+        const tags = personTagsFor(login, followingLogins, followerLogins);
 
         // Fetch GitHub profile for company/location/bio
         let profileData: { company: string | null; location: string | null; bio: string | null; name: string | null } | null = null;
@@ -153,8 +131,8 @@ export async function POST(req: Request) {
             bio: string | null;
             name: string | null;
           }>(token, `/users/${login}`);
-        } catch {
-          // Skip profile fetch on error — create person with basic data
+        } catch (e) {
+          console.warn(`profile fetch failed for ${login}`, e);
         }
 
         // Extract skills from user's repos
@@ -162,8 +140,8 @@ export async function POST(req: Request) {
         try {
           const repos = await fetchUserRepos(token, login, 1);
           extractedSkills = extractSkillsFromRepos(repos);
-        } catch {
-          // Skip repo fetch on error
+        } catch (e) {
+          console.warn(`repo fetch failed for ${login}`, e);
         }
 
         person = await db.person.create({
@@ -257,16 +235,12 @@ export async function POST(req: Request) {
         if (reverseEdge) {
           await db.edge.delete({ where: { id: reverseEdge.id } });
         }
-      } catch { /* ignore */ }
+      } catch (e) {
+        console.warn("reverse edge cleanup failed", e);
+      }
 
-      // Upsert edge between "You" and this person
-      const isMutual = followingLogins.has(login) && followerLogins.has(login);
-      const strength = isMutual ? 2 : 1;
-      const context = isMutual
-        ? "Mutual follow on GitHub"
-        : followingLogins.has(login)
-          ? "You follow them on GitHub"
-          : "They follow you on GitHub";
+      // Upsert edge between the own profile and this person
+      const { strength, context } = edgeContextFor(login, followingLogins, followerLogins);
 
       try {
         await db.edge.upsert({
@@ -290,22 +264,22 @@ export async function POST(req: Request) {
             context,
           },
         });
-      } catch {
+      } catch (e) {
+        console.warn("edge upsert failed", e);
         skipped++;
       }
     }
 
-    // --- Cross-edges: connect imported people who follow each other ---
+    // Cross-edges between imported people who follow each other
     let crossEdgesCreated = 0;
     const importedLogins = [...allUsers.keys()];
     const apiCallsUsed = { count: 0 };
 
-    // Check rate limit before starting cross-edge phase
     const rl = await getRateLimitRemaining(token);
     if (rl.remaining < MIN_RATE_LIMIT) {
       warnings.push("Skipped cross-edges: rate limit too low");
     } else {
-      // Re-fetch people list after creation to get updated data
+      // Re-read people after creation so cross-edges use fresh ids
       const updatedPeople = await db.person.findMany({ where: { userId } });
       const updatedByLogin = new Map<string, (typeof updatedPeople)[0]>();
       for (const p of updatedPeople) {
@@ -330,26 +304,26 @@ export async function POST(req: Request) {
         try {
           personFollowers = await fetchWithRetry(() => fetchUserFollowers(token, login, 1));
           apiCallsUsed.count++;
-        } catch {
+        } catch (e) {
+          console.warn(`followers fetch failed for ${login}`, e);
           continue;
         }
 
-        // Check if any of their followers are also in our graph
         for (const follower of personFollowers) {
           const personB = updatedByLogin.get(follower.login);
           if (!personB || personB.id === personA.id) continue;
 
-          // Skip if edge already exists (either direction)
-          const existingEdge = await db.edge.findUnique({
-            where: { sourceId_targetId: { sourceId: personA.id, targetId: personB.id } },
-          }).catch(() => null);
-          const reverseEdge = await db.edge.findUnique({
-            where: { sourceId_targetId: { sourceId: personB.id, targetId: personA.id } },
-          }).catch(() => null);
+          const [existingEdge, reverseEdge] = await Promise.all([
+            db.edge.findUnique({
+              where: { sourceId_targetId: { sourceId: personA.id, targetId: personB.id } },
+            }).catch(() => null),
+            db.edge.findUnique({
+              where: { sourceId_targetId: { sourceId: personB.id, targetId: personA.id } },
+            }).catch(() => null),
+          ]);
 
           if (existingEdge || reverseEdge) continue;
 
-          // Check if it's mutual (does B also follow A?)
           let isMutual = false;
           try {
             const bFollowsA = await fetch(`https://api.github.com/users/${follower.login}/following/${login}`, {
@@ -361,7 +335,9 @@ export async function POST(req: Request) {
             });
             apiCallsUsed.count++;
             isMutual = bFollowsA.status === 200;
-          } catch { /* assume not mutual */ }
+          } catch (e) {
+            console.warn("mutual check failed", e);
+          }
 
           try {
             await db.edge.create({
@@ -371,21 +347,23 @@ export async function POST(req: Request) {
                 origin: "github",
                 strength: isMutual ? 2 : 1,
                 context: isMutual
-                  ? `Mutual follow on GitHub`
+                  ? "Mutual follow on GitHub"
                   : `${personA.name} follows ${personB.name} on GitHub`,
                 communities: [],
                 projects: [],
               },
             });
             crossEdgesCreated++;
-          } catch { /* ignore duplicate or constraint errors */ }
+          } catch (e) {
+            console.warn("cross-edge create failed", e);
+          }
         }
       }
     }
 
     return NextResponse.json({ created, matched, skipped, crossEdgesCreated, warnings });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.warn("sync-connections failed", e);
+    return NextResponse.json({ error: "GitHub sync failed" }, { status: 500 });
   }
 }

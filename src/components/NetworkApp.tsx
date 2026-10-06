@@ -1,5 +1,4 @@
-// App shell: constellation, selection, modals, sync menus.
-
+// Main app shell: graph, selection, modals, and sync actions.
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
@@ -17,6 +16,16 @@ import {
   IconCompass, IconGitBranch,
 } from "./icons";
 import { ConfirmProvider } from "./ConfirmDialog";
+import { useToast } from "./useToast";
+import { useOutsideClose } from "./useOutsideClose";
+import {
+  describeConnectionsResult,
+  describeIndirectResult,
+  syncConnections,
+  syncIndirect,
+  syncProfile,
+  type SyncFilter,
+} from "@/lib/sync-client";
 
 function getInitialTheme(): "dark" | "light" {
   if (typeof window === "undefined") return "dark";
@@ -45,7 +54,7 @@ export default function NetworkApp() {
   const [showSyncMenu, setShowSyncMenu] = useState(false);
   const [showIndirectMenu, setShowIndirectMenu] = useState(false);
   const [indirectMax, setIndirectMax] = useState<number | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const { toast, showToast } = useToast();
   const apiRef = useRef<GraphApi | null>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [activeTab, setActiveTab] = useState<"network" | "discover">("network");
@@ -54,141 +63,62 @@ export default function NetworkApp() {
   const dragStartY = useRef<number | null>(null);
   const draggingRef = useRef(false);
 
-  // Toast auto-dismiss.
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
   // Reset sheet drag on selection change.
   useEffect(() => {
     setDragOffset(0);
   }, [selectedPersonId, selectedEdgeId]);
 
-  // Outside-click closers, setTimeout(0) avoids instant re-close.
-  useEffect(() => {
-    if (!showIndirectMenu) return;
-    const handler = () => setShowIndirectMenu(false);
-    const timer = setTimeout(() => document.addEventListener("click", handler), 0);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener("click", handler);
-    };
-  }, [showIndirectMenu]);
-
-  useEffect(() => {
-    if (!showSyncMenu) return;
-    const handler = () => setShowSyncMenu(false);
-    const timer = setTimeout(() => document.addEventListener("click", handler), 0);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener("click", handler);
-    };
-  }, [showSyncMenu]);
-
-  useEffect(() => {
-    if (!showOverflowMenu) return;
-    const handler = () => setShowOverflowMenu(false);
-    const timer = setTimeout(() => document.addEventListener("click", handler), 0);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener("click", handler);
-    };
-  }, [showOverflowMenu]);
+  useOutsideClose(showIndirectMenu, () => setShowIndirectMenu(false));
+  useOutsideClose(showSyncMenu, () => setShowSyncMenu(false));
+  useOutsideClose(showOverflowMenu, () => setShowOverflowMenu(false));
 
   const githubId = (session?.user as { githubId?: string })?.githubId ?? null;
 
-  // Pull followers/following in. Mutual keeps big circles sane.
-  const pullGithubCircle = async (filter: "all" | "following" | "mutual" = "all") => {
+  const handleSyncConnections = async (filter: SyncFilter = "all") => {
     setSyncingConnections(true);
     try {
-      const res = await fetch("/api/github/sync-connections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filter }),
-      });
-      const body = await res.json().catch(() => null);
-      if (res.ok && body) {
-        const parts: string[] = [];
-        if (body.created > 0) parts.push(`${body.created} new in your circle`);
-        if (body.matched > 0) parts.push(`${body.matched} refreshed`);
-        if (body.crossEdgesCreated > 0) parts.push(`${body.crossEdgesCreated} ties between them`);
-        if (body.skipped > 0) parts.push(`${body.skipped} skipped (rate-limit)`);
-        const msg = parts.length > 0 ? `Circle synced: ${parts.join(", ")}` : "Your circle is already up to date";
-        const warnings: string[] = body.warnings ?? [];
-        setToast({
-          message: warnings.length > 0 ? `${msg} (${warnings.join("; ")})` : msg,
-          type: warnings.length > 0 ? "error" : "success",
-        });
-      } else {
-        setToast({ message: body?.error ?? `Couldn't pull your GitHub circle (HTTP ${res.status}) — try again in a minute`, type: "error" });
-      }
-      await loadConstellation();
-    } catch {
-      setToast({ message: "Couldn't reach GitHub — are you offline? Your saved circle is intact.", type: "error" });
-      await loadConstellation();
+      const result = await syncConnections(filter);
+      const message = describeConnectionsResult(result);
+      showToast(
+        result.warnings.length > 0 ? `${message} (${result.warnings.join("; ")})` : message,
+        result.warnings.length > 0 ? "error" : "success",
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "GitHub sync failed", "error");
     }
+    await loadGraph();
     setSyncingConnections(false);
   };
-  // Legacy alias.
-  const handleSyncConnections = pullGithubCircle;
 
-  const handleSyncGithub = async () => {
+  const handleSyncProfile = async () => {
     setSyncingGithub(true);
     try {
-      const res = await fetch("/api/github/sync-profile", { method: "POST" });
-      const body = await res.json().catch(() => null);
-      if (res.ok) {
-        setToast({ message: "Your You-node refreshed from GitHub", type: "success" });
-      } else {
-        setToast({ message: body?.error ?? `Couldn't refresh your You-node (HTTP ${res.status})`, type: "error" });
-      }
-      await loadConstellation();
-    } catch {
-      setToast({ message: "GitHub profile sync failed — network hiccup, your circle is untouched", type: "error" });
-      await loadConstellation();
+      await syncProfile();
+      showToast("Profile refreshed from GitHub", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Profile sync failed", "error");
     }
+    await loadGraph();
     setSyncingGithub(false);
   };
 
-  // Second-degree sweep, capped.
   const handleSyncIndirect = async (maxConnections: number) => {
     setSyncingIndirect(true);
     try {
-      const res = await fetch("/api/github/sync-indirect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ maxConnections }),
-      });
-      const body = await res.json().catch(() => null);
-      if (res.ok && body) {
-        const parts: string[] = [];
-        if (body.cleanedUp > 0) parts.push(`${body.cleanedUp} stale removed`);
-        if (body.created > 0) parts.push(`${body.created} second-degree found`);
-        if (body.skipped > 0) parts.push(`${body.skipped} skipped`);
-        const msg = parts.length > 0
-          ? `Looked through ${body.connectionsExplored} ties — ${parts.join(", ")}`
-          : "No new second-degree ties turned up";
-        const warnings: string[] = body.warnings ?? [];
-        setToast({
-          message: warnings.length > 0 ? `${msg} (${warnings.join("; ")})` : msg,
-          type: warnings.length > 0 ? "error" : "success",
-        });
-      } else {
-        setToast({ message: body?.error ?? `Second-degree sweep failed (HTTP ${res.status}) — likely rate-limited`, type: "error" });
-      }
-      await loadConstellation();
-    } catch {
-      setToast({ message: "Second-degree sweep hit a network error — your circle is fine", type: "error" });
-      await loadConstellation();
+      const result = await syncIndirect(maxConnections);
+      const message = describeIndirectResult(result);
+      showToast(
+        result.warnings.length > 0 ? `${message} (${result.warnings.join("; ")})` : message,
+        result.warnings.length > 0 ? "error" : "success",
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Second-degree sync failed", "error");
     }
+    await loadGraph();
     setSyncingIndirect(false);
   };
 
-  // Full constellation fetch, no-store.
-  const loadConstellation = useCallback(async () => {
+  const loadGraph = useCallback(async () => {
     try {
       setError(null);
       const res = await fetch("/api/graph", { cache: "no-store" });
@@ -203,32 +133,29 @@ export default function NetworkApp() {
       setData((await res.json()) as GraphPayload);
       everLoadedRef.current = true;
     } catch {
-      setError("Could not load your constellation — check your connection and hit Retry.");
+      setError("Could not load your graph. Check your connection and try Retry.");
     } finally {
       setLoading(false);
     }
   }, []);
-  const load = loadConstellation;
 
-  useEffect(() => { loadConstellation(); }, [loadConstellation]);
+  useEffect(() => { loadGraph(); }, [loadGraph]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // Focus one thing at a time.
-  const focusCircleMember = useCallback((id: string | null) => {
+  // Only one of person / edge is selected at a time.
+  const selectPerson = useCallback((id: string | null) => {
     setSelectedPersonId(id);
     setSelectedEdgeId(null);
   }, []);
-  const selectPerson = focusCircleMember;
 
-  const focusTie = useCallback((id: string | null) => {
+  const selectEdge = useCallback((id: string | null) => {
     setSelectedEdgeId(id);
     setSelectedPersonId(null);
   }, []);
-  const selectEdge = focusTie;
 
   // Search matches name + nickname only.
   const matchedIds = useMemo(() => {
@@ -251,7 +178,7 @@ export default function NetworkApp() {
     [data, selectedEdgeId],
   );
 
-  // Full-screen error when circle never loaded.
+  // Full-screen error when the graph never loaded.
   if (error && !data) {
     const isSessionExpired = error.includes("Session expired");
     return (
@@ -263,7 +190,7 @@ export default function NetworkApp() {
           </div>
           <div className="flex gap-2 justify-center">
             {!isSessionExpired && (
-              <button className="btn-primary" onClick={() => { setLoading(true); load(); }}>Retry</button>
+              <button className="btn-primary" onClick={() => { setLoading(true); loadGraph(); }}>Retry</button>
             )}
             <button className="btn" onClick={() => signOut({ callbackUrl: "/login" })}>
               Sign out
@@ -279,7 +206,7 @@ export default function NetworkApp() {
       <div className="flex h-dvh items-center justify-center" style={{ color: "var(--text-muted)" }}>
         <div className="flex flex-col items-center gap-3">
           <IconLogo width={36} height={36} className="animate-pulse text-violet-400" />
-          <p className="text-sm">Charting your constellation...</p>
+          <p className="text-sm">Loading your graph...</p>
         </div>
       </div>
     );
@@ -303,7 +230,7 @@ export default function NetworkApp() {
           onPlaceNode={async () => {
             const p = pendingPlacement;
             setPendingPlacement(null);
-            await load();
+            await loadGraph();
             if (p) selectPerson(p.id);
           }}
           onReady={() => setGraphReady(true)}
@@ -550,7 +477,7 @@ export default function NetworkApp() {
               setActiveTab("network");
               // Hide until placed.
               setPendingPlacement({ id: person.id, name: person.name });
-              load();
+              loadGraph();
             }}
           />
         </div>
@@ -561,7 +488,7 @@ export default function NetworkApp() {
         <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ color: "var(--text-muted)", background: "var(--bg)" }}>
           <div className="flex flex-col items-center gap-3">
             <IconLogo width={36} height={36} className="animate-pulse text-violet-400" />
-            <p className="text-sm">Charting your constellation...</p>
+            <p className="text-sm">Loading your graph...</p>
           </div>
         </div>
       )}
@@ -617,7 +544,7 @@ export default function NetworkApp() {
                   <IconLogo width={40} height={40} className="mx-auto text-violet-400" />
                   <h1 className="text-lg font-semibold" style={{ color: "var(--text)" }}>Your sky is empty</h1>
                   <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
-                    Add the first person to your constellation to get started.
+                    Add the first person to your graph to get started.
                   </p>
                   <button className="btn-primary w-full" onClick={() => setShowAddPerson(true)}>
                     <IconPlus /> Add first person
@@ -681,10 +608,10 @@ export default function NetworkApp() {
               githubId={(session?.user as { githubId?: string })?.githubId ?? null}
               onClose={() => { selectPerson(null); setSelectedEdgeId(null); }}
               onSelectPerson={(id) => selectPerson(id)}
-              onChanged={async () => { await load(); }}
+              onChanged={async () => { await loadGraph(); }}
               onClearedSelection={() => selectPerson(null)}
               onEditEdgeSelected={selectPerson}
-              onSyncGithub={handleSyncGithub}
+              onSyncGithub={handleSyncProfile}
               syncingGithub={syncingGithub}
             />
           </div>
@@ -699,7 +626,7 @@ export default function NetworkApp() {
             setShowAddPerson(false);
             // Set pending first so canvas hides it until placed.
             setPendingPlacement({ id: person.id, name: person.name });
-            await load();
+            await loadGraph();
           }}
         />
       )}
@@ -708,7 +635,7 @@ export default function NetworkApp() {
           people={data.people}
           preselectedId={selectedPersonId}
           onClose={() => setShowAddEdge(false)}
-          onCreated={(edge: Relationship) => { setShowAddEdge(false); load().then(() => setSelectedEdgeId(edge.id)); }}
+          onCreated={(edge: Relationship) => { setShowAddEdge(false); loadGraph().then(() => setSelectedEdgeId(edge.id)); }}
         />
       )}
 

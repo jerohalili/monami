@@ -1,4 +1,4 @@
-// Add-member modal, supports Discover prefill.
+// Add-person modal, supports Discover prefill.
 "use client";
 
 import { useState } from "react";
@@ -72,7 +72,7 @@ export default function AddPersonModal({
         <PersonFormFields value={form} onChange={setForm} isNew />
         {error && <p className="text-sm text-red-400">{error}</p>}
         <button className="btn-primary w-full" onClick={create} disabled={saving}>
-          {saving ? "Adding…" : "Add to constellation"}
+          {saving ? "Adding…" : "Add person"}
         </button>
       </div>
     </Modal>

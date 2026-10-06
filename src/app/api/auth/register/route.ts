@@ -15,11 +15,11 @@ export async function POST(req: NextRequest) {
   const password = typeof r.password === "string" ? r.password : null;
 
   if (!email || !password) {
-    return NextResponse.json({ error: "We need both an email and password to start your circle" }, { status: 400 });
+    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
   }
 
-  if (password.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+  if (password.length < 8) {
+    return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
 
   const existing = await db.user.findUnique({ where: { email } });

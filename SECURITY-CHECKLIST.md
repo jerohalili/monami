@@ -52,7 +52,7 @@ Project has no workflows — rows 7–11 are N/A for that reason.
 |---|-------|----------------|----------|
 | 23 | Input from the user is validated on the server, not only in the browser | Yes | `name` required → 400, self-link rejected, `strength` clamped 1–3, `origin` allowlisted (`ORIGIN_KEYS`), email `includes(@)`, `currentPassword` required for changes |
 | 24 | User-supplied text is escaped when rendered, so it cannot inject markup or script | Yes | Default JSX escaping everywhere; only `dangerouslySetInnerHTML` is the static theme script (no user data); avatars via `remotePatterns` + `encodeURIComponent` |
-| 25 | Error responses do not expose stack traces, file paths or connection details | No | Mostly generic `{error}` with status codes, but `github/repos`, `sync-profile`, `sync-connections` return upstream `e.message` (may echo GitHub body) — will sanitize to generic 502/500 |
+| 25 | Error responses do not expose stack traces, file paths or connection details | Yes | Generic `{error}` with status codes; GitHub upstream bodies are logged server-side via `console.warn` and return generic 502/500 (`github/*`, `recommendations`) |
 | 26 | CORS is not a wildcard on routes that change data | Yes | No `Access-Control-*` headers; same-origin `fetch("/api/…")` only, no CORS config in `next.config.ts` |
 
 ## Repository and privacy

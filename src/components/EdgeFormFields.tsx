@@ -1,4 +1,4 @@
-// Shared tie form (origin, strength, context).
+// Shared edge form (origin, strength, context).
 
 "use client";
 
@@ -17,7 +17,7 @@ export const EMPTY_EDGE_FORM: EdgeFormState = {
   origin: "in_person", context: "", communities: "", projects: "", strength: "2", metAt: "",
 };
 
-// Tie -> form.
+// Edge -> form.
 export function edgeToForm(e: {
   origin: string;
   context: string | null;
@@ -48,7 +48,7 @@ export function formToEdgePayload(f: EdgeFormState) {
   };
 }
 
-const STRENGTH_LABELS: Record<string, string> = { "1": "Weak tie", "2": "Normal", "3": "Strong tie" };
+const STRENGTH_LABELS: Record<string, string> = { "1": "Weak", "2": "Normal", "3": "Strong" };
 
 export function EdgeFormFields({ value, onChange }: {
   value: EdgeFormState;

@@ -147,11 +147,9 @@ monami/
 ## 7. Known issues and next steps
 
 - Left to verify on `monami-one` prod: GitHub link/unlink and cascade delete, plus last responsive pass. Nothing blocking.
-- `github/*` error paths return upstream `e.message` (may echo GitHub body) — will sanitize to generic 502/500.
-- Password policy inconsistent (register ≥6 vs account change ≥8) — will unify to 8+.
 - `npm run db:reset` (`--force-reset`) is local-only danger — documented, never exposed via API.
 - Demo `guest@monami.app / guest123` is intentional shared demo with modify/delete hardening.
-- Next: error sanitization + policy unification, then clean `build + typecheck + graph smoke` (add person/edge, sync, Discover).
+- Tests: `npm test` (Vitest) covers `dto`, `skills`, `model`, `github-sync`, `recommend/scoring`; `npm run typecheck` clean.
 - Portfolio case study live at `jerohalili.github.io/projects/monami-networking-constellation` since Sep 25 — reuses these docs + screenshots for strangers/employers.
 
 ---

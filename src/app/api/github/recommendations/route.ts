@@ -1,4 +1,4 @@
-// Repo recs, scored by circle stars.
+// Repository recommendations, scored by network stars and language overlap.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -81,8 +81,8 @@ export async function GET(request: NextRequest) {
       );
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.warn("github recommendations failed", e);
+    return NextResponse.json({ error: "Could not load recommendations" }, { status: 500 });
   }
 }
 

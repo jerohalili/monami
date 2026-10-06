@@ -1,5 +1,4 @@
-// Whole constellation in one payload.
-
+// Whole graph in one payload, scoped to the signed-in user.
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { edgeDTO, personDTO } from "@/lib/dto";
@@ -64,6 +63,6 @@ export async function GET() {
       edges: edges.map(edgeDTO),
     });
   } catch {
-    return NextResponse.json({ error: "Sign in to view your constellation" }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to view the graph" }, { status: 401 });
   }
 }

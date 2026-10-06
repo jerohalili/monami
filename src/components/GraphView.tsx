@@ -1,5 +1,4 @@
-// Constellation canvas. Ties colored by origin, dashed = weak.
-
+// Interactive force-directed graph. Edge color encodes origin, line style encodes strength.
 "use client";
 
 import dynamic from "next/dynamic";
@@ -10,7 +9,7 @@ import {
   ORIGINS,
   hexToRgba,
   initialsOf,
-  nodeColor,
+  colorForName,
   type GraphPayload,
   type Person,
   type Relationship,
@@ -18,8 +17,7 @@ import {
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
-// Camera easing.
-function monamiEaseInOut(t: number): number {
+function easeInOutCubic(t: number): number {
   return t < 0.5
     ? 4 * t * t * t
     : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -49,11 +47,10 @@ interface GNode extends Person {
   fy?: number;
 }
 
-// Normalize link refs (string or {id}).
-function monamiLinkId(x: unknown): string {
+// d3-force mutates links to {id} objects, so accept both forms.
+function linkId(x: unknown): string {
   return typeof x === "object" && x !== null ? (x as { id: string }).id : String(x);
 }
-const lid = monamiLinkId;
 
 export default function GraphView({
   data,
@@ -197,7 +194,7 @@ export default function GraphView({
     }
     // Same ref if topology unchanged, avoids jolts.
     const nodeSig = nodes.map((n) => n.id).sort().join(",");
-    const linkSig = links.map((l) => `${lid(l.source)}->${lid(l.target)}`).sort().join(",");
+    const linkSig = links.map((l) => `${linkId(l.source)}->${linkId(l.target)}`).sort().join(",");
     const prev = graphDataRef.current;
     if (nodeSig === prev._nodeSig && linkSig === prev._linkSig) return prev;
     // Link-only change: mutate in place, no reheat.
@@ -277,7 +274,7 @@ export default function GraphView({
       });
     }
 
-    // Pull toward You-node, stronger if unconnected.
+    // Pull toward the own-profile node, stronger if unconnected.
     const xForce = forceX((n: object) => {
       const youNode = graphData.nodes.find((nd) => isYouNode(nd));
       return youNode?.x ?? 0;
@@ -293,7 +290,7 @@ export default function GraphView({
     // Reheat on topology change only.
     const nodeSig = graphData.nodes.map((n) => n.id).sort().join(",");
     const linkSig = graphData.links
-      .map((l) => `${lid(l.source)}->${lid(l.target)}`)
+      .map((l) => `${linkId(l.source)}->${linkId(l.target)}`)
       .sort()
       .join(",");
     if (nodeSig !== nodeSigRef.current || linkSig !== linkSigRef.current) {
@@ -406,7 +403,7 @@ export default function GraphView({
     const tick = () => {
       const elapsed = performance.now() - startTime;
       const t = Math.min(elapsed / duration, 1);
-      const e = monamiEaseInOut(t);
+      const e = easeInOutCubic(t);
       g.centerAt(
         startCenter.x + (cx - startCenter.x) * e,
         startCenter.y + (cy - startCenter.y) * e,
@@ -477,7 +474,7 @@ export default function GraphView({
     const cx = n.x!;
     const cy = n.y!;
 
-    // Draw avatar image or fallback circle with initials.
+    // Draw avatar image or fallback initials.
     let drewAvatar = false;
     if (n.avatarUrl) {
       const img = ensureAvatar(n.avatarUrl);
@@ -498,7 +495,7 @@ export default function GraphView({
     if (!drewAvatar) {
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = nodeColor(n.name);
+      ctx.fillStyle = colorForName(n.name);
       ctx.fill();
       const fs = r * (initialsOf(n.name).length > 1 ? 0.9 : 1.2);
       ctx.font = `600 ${fs}px system-ui, sans-serif`;
@@ -557,8 +554,8 @@ export default function GraphView({
 
     // Dim non-matching links during search
     let alpha = 0.45;
-    const sid = lid(e.source);
-    const tid = lid(e.target);
+    const sid = linkId(e.source);
+    const tid = linkId(e.target);
     const touchesSelection =
       e.id === selectedEdgeId ||
       (selectedPersonId && (sid === selectedPersonId || tid === selectedPersonId));
@@ -589,7 +586,7 @@ export default function GraphView({
     ctx.lineWidth = w;
     ctx.lineCap = "round";
 
-    // Dashed lines for weak ties
+    // Dashed lines for weak edges
     if (e.strength <= 1) ctx.setLineDash([8 / globalScale, 5 / globalScale]);
 
     ctx.beginPath();
@@ -779,7 +776,7 @@ export default function GraphView({
               top: tipPos.y - 14,
               width: 28,
               height: 28,
-              background: nodeColor(pendingPlacement.name),
+              background: colorForName(pendingPlacement.name),
               border: "2px solid #8b5cf6",
               boxShadow: "0 0 12px rgba(139,92,246,0.5)",
             }}

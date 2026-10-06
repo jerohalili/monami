@@ -1,5 +1,5 @@
-// Skill aliases, GitHub topics are messy.
-// TODO(jero): move to DB + user-editable aliases.
+// Canonical skill names. GitHub languages and topics vary widely,
+// so normalize before comparing or scoring.
 
 const SKILL_SYNONYMS: Record<string, string> = {
   // Frontend
@@ -167,13 +167,12 @@ for (const [alias, canonical] of Object.entries(SKILL_SYNONYMS)) {
   CANONICAL.set(alias.toLowerCase(), canonical);
 }
 
-// Single skill -> canonical.
+// Map a single skill to its canonical form.
 export function normalizeSkill(skill: string): string {
   return CANONICAL.get(skill.toLowerCase()) ?? skill;
 }
-export const normalizeCircleSkill = normalizeSkill;
 
-// Dedupe by canonical form.
+// Dedupe a list by canonical form, preserving first-seen order.
 export function normalizeSkills(skills: string[]): string[] {
   const seen = new Set<string>();
   return skills.map(normalizeSkill).filter((s) => {
@@ -186,7 +185,7 @@ export function normalizeSkills(skills: string[]): string[] {
 
 import type { GitHubRepo } from "./github";
 
-// Top skills from repos, lang 2x + topics 1x.
+// Score languages twice and topics once, return the top 8.
 export function extractSkillsFromRepos(repos: GitHubRepo[]): string[] {
   const skillCounts = new Map<string, number>();
 

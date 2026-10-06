@@ -1,4 +1,4 @@
-// Tie origins + graph colors. Amber = in-person, purple = github_indirect.
+// Edge origins and shared graph types.
 
 export const ORIGINS = {
   in_person: { label: "Met in person", color: "#f59e0b" },
@@ -18,7 +18,7 @@ export function isOrigin(v: unknown): v is Origin {
   return typeof v === "string" && ORIGIN_KEYS.includes(v as Origin);
 }
 
-// Person = node, Relationship = tie (strength 1-3).
+// Person is a graph node, Relationship is an edge (strength 1-3).
 
 export interface Person {
   id: string;
@@ -54,9 +54,7 @@ export interface GraphPayload {
   edges: Relationship[];
 }
 
-// Stable node colors per name.
-// TODO(jero): pull palettes into globals.css vars.
-
+// Stable color per name.
 const DARK_NODE_PALETTE = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
   "#06b6d4", "#f97316", "#84cc16", "#eab308", "#14b8a6",
@@ -67,7 +65,6 @@ const LIGHT_NODE_PALETTE = [
   "#0891b2", "#ea580c", "#65a30d", "#ca8a04", "#0d9488",
 ];
 
-// Name -> stable palette color.
 export function colorForName(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -75,12 +72,6 @@ export function colorForName(name: string): string {
   const palette = isLight ? LIGHT_NODE_PALETTE : DARK_NODE_PALETTE;
   return palette[h % palette.length];
 }
-
-// Constellation alias for canvas call sites.
-export function nodeColor(name: string): string {
-  return colorForName(name);
-}
-export const constellationColorFor = colorForName;
 
 // DiceBear fallback, seeded by name.
 export function autoAvatarUrl(name: string): string {
@@ -96,9 +87,8 @@ export function initialsOf(name: string): string {
     .map((p) => p[0]!.toUpperCase())
     .join("");
 }
-export const monamiInitials = initialsOf;
 
-// hex -> rgba for canvas glows.
+// Hex color to rgba string.
 export function hexToRgba(hex: string, alpha: number): string {
   const m = hex.replace("#", "");
   const r = parseInt(m.slice(0, 2), 16);
@@ -107,13 +97,11 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// Shared traits, case-insensitive.
-export function sharedCircleTraits(a: string[], b: string[]): string[] {
+// Case-insensitive intersection, preserves order of `a`.
+export function sharedTraits(a: string[], b: string[]): string[] {
   const lower = new Set(b.map((s) => s.toLowerCase()));
   return a.filter((s) => lower.has(s.toLowerCase()));
 }
-// Legacy alias.
-export const overlap = sharedCircleTraits;
 
 export interface RecommendedPerson {
   name: string;

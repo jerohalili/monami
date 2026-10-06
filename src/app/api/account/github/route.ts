@@ -1,4 +1,4 @@
-// Unlink GitHub, keeps circle intact.
+// Unlink GitHub, keeps people and edges intact.
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
