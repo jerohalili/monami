@@ -11,7 +11,6 @@ Started week 1, kept alongside work. Full 6 + 3 + who-wrote-what for finals badg
 - 2026-09-02, Copilot — people + repo recommenders (`recommendations/route.ts`, `github/recommendations`, `lib/skills.ts`). Kept scoring, rebalanced after mutual-overweight. Commits [`8bac171`](https://github.com/jerohalili/monami/commit/8bac171fac1651d73eba36cd949c2147e6ee13e4), [`bdba6ff`](https://github.com/jerohalili/monami/commit/bdba6ff7488dbd57898fc01317ada3c6ef1d8212), [`a9bad81`](https://github.com/jerohalili/monami/commit/a9bad813ce4a5ecedc30be5fe1146eb072ec67ec).
 - 2026-09-19, Claude — README 1–7 + SECURITY-CHECKLIST wording. Kept structure, evidence in own words. Commit [`2c3f4fb`](https://github.com/jerohalili/monami/commit/2c3f4fb06425084f287a67a81c5fce08d84cf477).
 - 2026-09-20–26 (Week 5) — no new AI prompts logged. Screenshots + caption cleanup + portfolio case-study assembly done by hand; no code changes.
-- 2026-10-06, hand refactor — de-vibecoded by hand: removed `Circle/monami/tie` aliases, unified on `Person`/`Edge`, extracted `useToast`/`useOutsideClose`/`sync-client`/`useFiltered`/`recommend/scoring`/`github-sync`, sanitized GitHub error passthroughs, unified password to 8+, replaced `$queryRaw` cleanup with Prisma filter, added Vitest coverage (`dto`, `skills`, `model`, `github-sync`, `recommend/scoring`). No AI prompts used.
 
 ## 2. Where the AI got it wrong
 
